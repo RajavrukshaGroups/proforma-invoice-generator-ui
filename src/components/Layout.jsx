@@ -89,7 +89,7 @@ const handleLogout = () => {
       <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-3">
 
   <div className="px-4 py-2">
-    <p className="text-xs text-slate-500">
+    <p className="text-xs text-slate-600 dark:text-slate-400">
       Logged in as
     </p>
 
@@ -97,7 +97,7 @@ const handleLogout = () => {
       {user?.name || "User"}
     </p>
 
-    <p className="text-xs text-slate-500 truncate">
+    <p className="text-xs text-slate-600 truncate dark:text-slate-400">
       {user?.email}
     </p>
   </div>

@@ -4,6 +4,7 @@ import { ArrowLeft, Download, Printer, Check, Phone, Mail, Globe, MapPin, Buildi
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getInvoiceHistory } from '../utils/localStorage';
 import Logo from '../assets/logo.png';
+import API from '../api/axios';
 
 
 // Vector fallback logo mirroring the sample image (Digital Elite Service) perfectly
@@ -78,8 +79,8 @@ useEffect(() => {
       }
 
       if (idFromQuery) {
-        const res = await fetch(`http://localhost:5000/getPI/${idFromQuery}`);
-        const data = await res.json();
+        const res = await API.get(`/getPI/${idFromQuery}`);
+        const data = res.data;
 
         if (data.success) {
           setInvoice(data.data);

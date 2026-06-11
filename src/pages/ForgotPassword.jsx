@@ -1,6 +1,7 @@
 import React, {
   useState,
 } from "react";
+import API from '../api/axios';
 
 export default function ForgotPassword() {
   const [email, setEmail] =
@@ -10,23 +11,9 @@ export default function ForgotPassword() {
     async (e) => {
       e.preventDefault();
 
-      const response =
-        await fetch(
-          "http://localhost:5000/api/auth/forgot-password",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              email,
-            }),
-          }
-        );
+      const response = await API.post("/api/auth/forgot-password", { email });
 
-      const data =
-        await response.json();
+      const data = response.data;
 
       alert(data.message);
     };

@@ -268,6 +268,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getInvoiceHistory, deleteInvoice } from '../utils/localStorage';
 import { Search, Eye, Edit2, Copy, Trash2, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
+import API from '../api/axios';
 
 const ITEMS_PER_PAGE = 8;
 
@@ -282,8 +283,8 @@ export default function HistoryView() {
   // };
   const loadInvoices = async () => {
   try {
-    const res = await fetch("http://localhost:5000/getAllPI");
-    const data = await res.json();
+    const res = await API.get("/getAllPI");
+    const data = res.data;
 
     if (data.success) {
       setInvoices(data.data);
@@ -357,11 +358,9 @@ export default function HistoryView() {
   // };
 const handleDelete = async (id) => {
   try {
-    const res = await fetch(`http://localhost:5000/deletePI/${id}`, {
-      method: "DELETE",
-    });
+    const res = await API.delete(`/deletePI/${id}`);
 
-    const data = await res.json();
+    const data = res.data;
 
     if (data.success) {
       setShowConfirmId(null);

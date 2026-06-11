@@ -233,6 +233,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getInvoiceHistory } from '../utils/localStorage';
 import { Plus, Users, Receipt, TrendingUp, Settings, Eye, Download, Star } from 'lucide-react';
+import API from '../api/axios';
 
 export default function Dashboard() {
   const [invoices, setInvoices] = useState([]);
@@ -245,8 +246,8 @@ export default function Dashboard() {
   useEffect(() => {
   const loadInvoices = async () => {
     try {
-      const res = await fetch("http://localhost:5000/getAllPI");
-      const data = await res.json();
+      const res = await API.get("/getAllPI");
+      const data = res.data;
 
       if (data.success) {
         setInvoices(data.data);

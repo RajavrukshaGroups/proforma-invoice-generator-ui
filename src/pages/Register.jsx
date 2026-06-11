@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import API from '../api/axios';
 
 export default function Register() {
   const navigate = useNavigate();
@@ -22,22 +23,9 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const response = await fetch(
-      "http://localhost:5000/api/auth/register",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type":
-            "application/json",
-        },
-        body: JSON.stringify(
-          formData
-        ),
-      }
-    );
+    const response = await API.post("/api/auth/register", formData);
 
-    const data =
-      await response.json();
+    const data = response.data;
 
     if (data.success) {
       alert(

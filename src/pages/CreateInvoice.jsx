@@ -1488,6 +1488,7 @@ import {
 } from '../utils/localStorage';
 import { calculateGST } from '../utils/calculations';
 import { Plus, Trash, Save, FileText, Check, AlertTriangle, RefreshCcw } from 'lucide-react';
+import API from '../api/axios';
 
 const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{3}$/i;
 const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/i;
@@ -1585,8 +1586,8 @@ export default function CreateInvoice() {
     if (!idParam) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/getPI/${idParam}`);
-      const data = await res.json();
+      const res = await API.get(`/getPI/${idParam}`);
+      const data = res.data;
 
       if (!data.success) return;
 
@@ -1747,18 +1748,11 @@ const onSubmit = async (data) => {
 
     // ✅ UPDATE FLOW
     if (isEditMode && editingInvoiceSnap?._id) {
-      const response = await fetch(
-        `http://localhost:5000/updatePI/${editingInvoiceSnap._id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      const response = await API.put(`/updatePI/${editingInvoiceSnap._id}`, payload);
 
-      const result = await response.json();
+      const result = response.data;
 
-      if (!response.ok) {
+      if (response.status !== 200 && response.status !== 201) {
         throw new Error(result.message || "Update failed");
       }
 
@@ -1769,15 +1763,11 @@ const onSubmit = async (data) => {
     }
 
     // ✅ CREATE FLOW
-    const response = await fetch("http://localhost:5000/createPI", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+    const response = await API.post("/createPI", payload);
 
-    const result = await response.json();
+    const result = response.data;
 
-    if (!response.ok) {
+    if (response.status !== 200 && response.status !== 201) {
       throw new Error(result.message || "Create failed");
     }
 

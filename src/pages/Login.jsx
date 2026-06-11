@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
+import API from '../api/axios';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -20,18 +21,9 @@ export default function Login() {
     e.preventDefault();
 
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/auth/login",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(formData),
-        }
-      );
+      const response = await API.post("/api/auth/login", formData);
 
-      const data = await response.json();
+      const data = response.data;
 
       if (data.success) {
         localStorage.setItem(
@@ -93,11 +85,11 @@ export default function Login() {
           </Link>
         </div>
 
-        <div className="mt-2 text-center hover:underline hover:cursor-pointer text-blue-600 dark:text-gray-400">
+        {/* <div className="mt-2 text-center hover:underline hover:cursor-pointer text-blue-600 dark:text-gray-400">
           <Link to="/register">
             Create Account
           </Link>
-        </div>
+        </div> */}
       </form>
     </div>
   );

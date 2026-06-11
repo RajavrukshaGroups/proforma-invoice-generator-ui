@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { Save, Upload, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
+import API from '../api/axios';
 
 export default function Settings() {
   const { settings: contextSettings, setSettings: setContextSettings } = useSettings();
@@ -34,12 +35,9 @@ export default function Settings() {
 
   // Fetch settings from backend on mount
   useEffect(() => {
-    fetch('http://localhost:5000/getSettings')
+    API.get('/getSettings')
       .then((res) => {
-        if (!res.ok) throw new Error('Failed to load settings');
-        return res.json();
-      })
-      .then((data) => {
+        const data = res.data;
         if (data && data.length > 0) {
           const latest = data[0];
           setContextSettings(latest);
@@ -109,27 +107,20 @@ export default function Settings() {
 
     setContextSettings(finalizedSettings);
     // Persist to backend (only the selected fields)
-    fetch('http://localhost:5000/saveSettings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        gstin: finalizedSettings.gstin,
-        pan: finalizedSettings.pan,
-        address: finalizedSettings.address,
-        bankName: finalizedSettings.bankName,
-        accountNumber: finalizedSettings.accountNumber,
-        ifscCode: finalizedSettings.ifscCode,
-        branch: finalizedSettings.branch,
-        phone: finalizedSettings.phone,
-        email: finalizedSettings.email,
-        website: finalizedSettings.website,
-      }),
+    API.post('/saveSettings', {
+      gstin: finalizedSettings.gstin,
+      pan: finalizedSettings.pan,
+      address: finalizedSettings.address,
+      bankName: finalizedSettings.bankName,
+      accountNumber: finalizedSettings.accountNumber,
+      ifscCode: finalizedSettings.ifscCode,
+      branch: finalizedSettings.branch,
+      phone: finalizedSettings.phone,
+      email: finalizedSettings.email,
+      website: finalizedSettings.website,
     })
       .then((res) => {
-        if (!res.ok) throw new Error('Failed to save settings');
-        return res.json();
-      })
-      .then(() => {
+        const data = res.data;
         setNotif({ type: 'success', message: 'Company settings saved successfully!' });
       })
       .catch(() => {

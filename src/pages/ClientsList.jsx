@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, FilePlus2, MapPin, Loader2, Building2, Search } from 'lucide-react';
+import API from '../api/axios';
 
 export default function ClientsList() {
   const [clients, setClients] = useState([]);
@@ -15,8 +16,8 @@ export default function ClientsList() {
   useEffect(() => {
     const fetchClients = async () => {
       try {
-        const res = await fetch('http://localhost:5000/getAllPI');
-        const data = await res.json();
+        const res = await API.get('/getAllPI');
+        const data = res.data;
         
         if (!data.success) {
           throw new Error(data.message || 'Failed to fetch invoices');
