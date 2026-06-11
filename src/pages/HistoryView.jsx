@@ -4,7 +4,7 @@
 
 // const ITEMS_PER_PAGE = 8;
 
-// export default function HistoryView({ invoices, onNavigate, onEdit, onDuplicate, onRefresh }) {
+// export default function HistoryView({ invoices, onNavigate, onEdit, onDuplicate, onRefresh, clientFilter }) {
 //   const [searchTerm, setSearchTerm] = useState('');
 //   const [currentPage, setCurrentPage] = useState(1);
 //   const [showConfirmId, setShowConfirmId] = useState(null);
@@ -12,17 +12,22 @@
 //   // Search logic: checks both Invoice Number and Customer Name
 //   const filteredInvoices = useMemo(() => {
 //     const rawSearch = searchTerm.toLowerCase().trim();
-//     if (!rawSearch) return invoices;
-    
+//     if (!rawSearch && !clientFilter) return invoices;
+
 //     return invoices.filter(inv => {
-//       return (
-//         inv.invoiceNumber.toLowerCase().includes(rawSearch) ||
-//         inv.customer.customerName.toLowerCase().includes(rawSearch) ||
-//         (inv.customer.city && inv.customer.city.toLowerCase().includes(rawSearch)) ||
-//         (inv.customer.state && inv.customer.state.toLowerCase().includes(rawSearch))
-//       );
+//       const matchesSearch =
+//         inv.invoiceNumber?.toLowerCase().includes(rawSearch) ||
+//         inv.customer?.customerName?.toLowerCase().includes(rawSearch) ||
+//         inv.customer?.city?.toLowerCase().includes(rawSearch) ||
+//         inv.customer?.state?.toLowerCase().includes(rawSearch);
+
+//       const matchesClient = clientFilter
+//         ? inv.customer?.customerName === clientFilter.customerName
+//         : true;
+
+//       return (rawSearch ? matchesSearch : true) && matchesClient;
 //     });
-//   }, [invoices, searchTerm]);
+//   }, [invoices, searchTerm, clientFilter]);
 
 //   // Pagination logic
 //   const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
@@ -260,7 +265,7 @@
 
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { getInvoiceHistory, deleteInvoice } from '../utils/localStorage';
 import { Search, Eye, Edit2, Copy, Trash2, ChevronLeft, ChevronRight, FileText } from 'lucide-react';
 
@@ -269,6 +274,8 @@ const ITEMS_PER_PAGE = 8;
 export default function HistoryView() {
   const [invoices, setInvoices] = useState([]);
   const navigate = useNavigate();
+  const location = useLocation();
+  const clientFilter = location.state?.client || null;
 
   // const loadInvoices = () => {
   //   setInvoices(getInvoiceHistory());
@@ -322,23 +329,17 @@ export default function HistoryView() {
   // Search logic: checks both Invoice Number and Customer Name
   const filteredInvoices = useMemo(() => {
     const rawSearch = searchTerm.toLowerCase().trim();
-    if (!rawSearch) return invoices;
-    
     return invoices.filter(inv => {
-      // return (
-      //   inv.invoiceNumber.toLowerCase().includes(rawSearch) ||
-      //   inv.customer.customerName.toLowerCase().includes(rawSearch) ||
-      //   (inv.customer.city && inv.customer.city.toLowerCase().includes(rawSearch)) ||
-      //   (inv.customer.state && inv.customer.state.toLowerCase().includes(rawSearch))
-      // );
-      return (
+      const matchesSearch = rawSearch ? (
         inv.invoiceNumber?.toLowerCase().includes(rawSearch) ||
         inv.customer?.customerName?.toLowerCase().includes(rawSearch) ||
         inv.customer?.city?.toLowerCase().includes(rawSearch) ||
         inv.customer?.state?.toLowerCase().includes(rawSearch)
-      );
+      ) : true;
+      const matchesClient = clientFilter ? inv.customer?.customerName === clientFilter.customerName : true;
+      return matchesSearch && matchesClient;
     });
-  }, [invoices, searchTerm]);
+  }, [invoices, searchTerm, clientFilter]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
@@ -404,7 +405,7 @@ const handleDelete = async (id) => {
 
         {/* Create Invoice Shortcut */}
         <button
-          onClick={() => handleNavigate('create')}
+          onClick={() => navigate('/create', { state: { clientData: clientFilter } })}
           className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl shadow-sm transition-all hover:scale-102 flex items-center gap-2 self-start md:self-auto hover:cursor-pointer"
         >
           <span>+ Create New Invoice</span>

@@ -8,6 +8,9 @@ export default function ClientsList() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
+  const handleNavigateHistory = (client) => {
+    navigate('/history-view', { state: { client } });
+  };
 
   useEffect(() => {
     const fetchClients = async () => {
@@ -132,7 +135,8 @@ export default function ClientsList() {
           {filteredClients.map((client, index) => (
             <div 
               key={index}
-              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm flex flex-col h-full hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors"
+              onClick={() => handleNavigateHistory(client)}
+              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm flex flex-col h-full hover:border-indigo-300 dark:hover:border-indigo-700 transition-colors cursor-pointer"
             >
               <div className="flex-1">
                 <div className="flex items-start gap-3 mb-4">
@@ -166,7 +170,7 @@ export default function ClientsList() {
 
               <div className="pt-4 border-t border-gray-100 dark:border-gray-800 mt-auto">
                 <button
-                  onClick={() => handleCreateInvoice(client)}
+                  onClick={(e) => { e.stopPropagation(); handleCreateInvoice(client); }}
                   className="w-full flex items-center justify-center gap-2 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 rounded-xl font-semibold text-sm transition-colors"
                 >
                   <FilePlus2 className="w-4 h-4" />
