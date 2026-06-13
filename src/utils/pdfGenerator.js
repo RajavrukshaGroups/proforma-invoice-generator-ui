@@ -497,11 +497,9 @@
 
 
 
-// utils/pdfGenerator.js
-
 /**
- * Downloads PDF using browser's print-to-PDF functionality
- * This bypasses html2canvas completely and uses native browser rendering
+ * Downloads PDF using browser's native print-to-PDF functionality
+ * This generates a true vector PDF (crisp text, selectable) and uses CSS fixes for mobile viewports.
  */
 export async function downloadPDF(elementId, filename = 'document') {
   try {
@@ -546,19 +544,21 @@ export async function downloadPDF(elementId, filename = 'document') {
     // Write content to iframe
     const iframeDoc = iframe.contentWindow.document;
     iframeDoc.open();
+    
+    // The key to fixing mobile printing is locking the viewport to the exact 794px width
+    // and removing any artificial CSS scaling, relying entirely on the browser's A4 fit.
     iframeDoc.write(`
       <!DOCTYPE html>
       <html>
         <head>
           <title>${filename}</title>
           <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <meta name="viewport" content="width=794, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
           ${stylesHTML}
           <style>
-            /* Print-specific styles */
             @media print {
               @page {
-                size: A4;
+                size: 210mm 297mm;
                 margin: 0;
               }
               body {
@@ -566,13 +566,23 @@ export async function downloadPDF(elementId, filename = 'document') {
                 padding: 0;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+                background: white;
+                width: 210mm !important;
               }
               .no-print {
                 display: none !important;
               }
               #print-container {
-                transform: scale(0.95);
-                transform-origin: top center;
+                width: 210mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                box-shadow: none !important;
+                border: none !important;
+              }
+              /* Override inline styles of the cloned element to ensure it fills the 210mm space without overflowing */
+              #print-container > div {
+                width: 210mm !important;
+                min-height: 297mm !important;
               }
             }
             
@@ -584,12 +594,11 @@ export async function downloadPDF(elementId, filename = 'document') {
             }
             
             #print-container {
-              width: 794px;
-              margin: 0 auto;
+              width: 100%;
+              margin: 0;
               background: white;
             }
             
-            /* Ensure all colors print correctly */
             * {
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
@@ -666,7 +675,7 @@ export function triggerPrint(elementId = 'printable-proforma-invoice', filename 
           <style>
             @media print {
               @page {
-                size: A4;
+                size: 210mm 297mm;
                 margin: 0;
               }
               body {
@@ -674,10 +683,16 @@ export function triggerPrint(elementId = 'printable-proforma-invoice', filename 
                 padding: 0;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
+                width: 210mm !important;
               }
               #print-content {
-                transform: scale(0.95);
-                transform-origin: top center;
+                width: 210mm !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              #print-content > div {
+                width: 210mm !important;
+                min-height: 297mm !important;
               }
             }
             body {
@@ -686,7 +701,7 @@ export function triggerPrint(elementId = 'printable-proforma-invoice', filename 
               font-family: Calibri, "Segoe UI", Roboto, Arial, sans-serif;
             }
             #print-content {
-              width: 794px;
+              width: 100%;
               margin: 0 auto;
             }
             * {

@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { downloadPDF, triggerPrint } from '../utils/pdfGenerator';
-import { ArrowLeft, Download, Printer, Check, Phone, Mail, Globe, MapPin, Building, CreditCard } from 'lucide-react';
+import { ArrowLeft, Download, Printer, Check, Phone, Mail, Globe, MapPin, Home, Building, CreditCard } from 'lucide-react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getInvoiceHistory } from '../utils/localStorage';
 import Logo from '../assets/logo.png';
@@ -29,7 +29,7 @@ const FallbackLogo = () => (
     <img src={Logo} className="w-15 h-full" alt="Logo" />
     <div>
       <div className="text-xl font-extrabold tracking-tight text-slate-800 leading-none">Digital</div>
-      <div className="text-xs font-semibold text-slate-500 tracking-wider">Elite Service</div>
+      <div className="text-xs font-semibold  text-slate-600 tracking-wider">Elite Service</div>
     </div>
   </div>
 );
@@ -57,18 +57,61 @@ export default function InvoicePreview({ invoice: propInvoice, onBack: propOnBac
   const navigate = useNavigate();
   const [downloading, setDownloading] = useState(false);
   const [invoice, setInvoice] = useState(propInvoice);
+  
+  const containerRef = useRef(null);
+  const [zoomScale, setZoomScale] = useState(1);
 
   const idFromQuery = searchParams.get('id');
 
-  // useEffect(() => {
-  //   if (propInvoice) {
-  //     setInvoice(propInvoice);
-  //   } else if (idFromQuery) {
-  //     const historyList = getInvoiceHistory();
-  //     const found = historyList.find(inv => inv.id === idFromQuery);
-  //     setInvoice(found);
-  //   }
-  // }, [propInvoice, idFromQuery]);
+  useEffect(() => {
+    let animationFrameId;
+
+    const handleResize = () => {
+      if (containerRef.current && containerRef.current.parentElement) {
+        // Measure the actual parent container width to determine safe available space
+        const parentWidth = containerRef.current.parentElement.getBoundingClientRect().width;
+        
+        // Subtract container paddings. p-2 gives 16px horizontal padding.
+        const isMobile = window.innerWidth < 640;
+        const containerPadding = isMobile ? 32 : 64; 
+        
+        const availableWidth = parentWidth - containerPadding;
+        
+        if (availableWidth > 0 && availableWidth < 794) {
+          setZoomScale(availableWidth / 794);
+        } else {
+          setZoomScale(1);
+        }
+      }
+    };
+
+    const throttledResize = () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      animationFrameId = requestAnimationFrame(handleResize);
+    };
+
+    // Initial calculation
+    throttledResize();
+    setTimeout(throttledResize, 100);
+
+    // Use ResizeObserver for rock-solid DOM width tracking
+    const observer = new ResizeObserver(() => {
+      throttledResize();
+    });
+
+    if (containerRef.current && containerRef.current.parentElement) {
+      observer.observe(containerRef.current.parentElement);
+      observer.observe(document.body);
+    }
+
+    window.addEventListener('resize', throttledResize);
+    
+    return () => {
+      window.removeEventListener('resize', throttledResize);
+      observer.disconnect();
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
 
 useEffect(() => {
   const fetchInvoice = async () => {
@@ -130,7 +173,7 @@ useEffect(() => {
   };
 
   return (
-    <div className="space-y-6 p-10">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-10 w-full max-w-full box-border overflow-x-hidden">
       {/* Control Actions Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-5">
         <button
@@ -162,27 +205,87 @@ useEffect(() => {
       </div>
 
       {/* Screen Preview Wrapper with Responsive Zoom Scale */}
-      <div className="flex justify-center bg-slate-100 dark:bg-slate-950 p-4 sm:p-8 rounded-2xl overflow-x-auto min-h-[600px] border border-gray-200 dark:border-gray-900 shadow-inner">
-        
-        {/* Printable/A4 Document Block */}
-        {/* Force bg-white text-black so it renders beautifully in print mode and Canvas extraction */}
+      {/* <div 
+        ref={containerRef}
+        className="w-full bg-slate-100 dark:bg-slate-950 p-2 sm:p-8 rounded-2xl flex justify-center overflow-x-auto min-h-[600px] border border-gray-200 dark:border-gray-900 shadow-inner "
+      style={{border:"orenge 4px"}}
+      >
+         */}
+      <div
+  ref={containerRef}
+  className="w-full bg-slate-100 dark:bg-slate-950 p-2 sm:p-8 rounded-2xl flex justify-center overflow-x-auto min-h-[600px] shadow-inner"
+>
+        {/* Scaled Wrapper to perfectly fit the A4 dimension within mobile viewports */}
         <div 
-          id={printableAreaId}
-          className="relative bg-white text-slate-900 border border-slate-350 shadow-2xl p-8 mx-auto pointer-events-auto rounded-none text-[12px] font-sans overflow-hidden shrink-0 print:border-0 print:shadow-none print:p-8"
+          className="relative transition-all duration-200 ease-out"
           style={{
-            width: '794px',
-            minHeight: '1123px', // standard A4 aspect
-            boxSizing: 'border-box',
-            fontFamily: 'Calibri, "Segoe UI", Roboto, Arial, sans-serif'
+             width: `${794 * zoomScale}px`,
+             height: `${1123 * zoomScale}px`
           }}
         >
-          {/* Accent top decoration matching "Digital Elite Service" banner vibes */}
-          <div className="absolute top-0 right-0 w-32 h-16 bg-gradient-to-bl from-orange-400/90 to-amber-300/10 rounded-bl-full" />
-          <div className="absolute top-0 left-0 w-16 h-40 bg-gradient-to-br from-sky-400/20 to-blue-500/0 rounded-r-full" />
+          <div 
+            style={{
+              transform: `scale(${zoomScale})`,
+              transformOrigin: 'top left',
+              // borderTop: "12px solid #f59e0b",
+              // borderRight: "12px solid #f59e0b",
+ 
+            }}
+            className="absolute top-0 left-0"
 
+          >
+            {/* Printable/A4 Document Block */}
+            {/* Force bg-white text-black so it renders beautifully in print mode and Canvas extraction */}
+            <div 
+              id={printableAreaId}
+              className="relative bg-white text-slate-900 border border-slate-350 shadow-2xl p-8 pointer-events-auto rounded-none text-[12px] font-sans overflow-hidden print:border-0 print:shadow-none print:p-8"
+              style={{
+                width: '794px',
+                minHeight: '1123px', // standard A4 aspect
+                boxSizing: 'border-box',
+                fontFamily: 'Calibri, "Segoe UI", Roboto, Arial, sans-serif',
+             
+    // borderTop: "12px solid #f59e0b",
+    // borderRight: "12px solid #f59e0b",
+ 
+              }}
+            >
+          {/* Accent top decoration matching "Digital Elite Service" banner vibes */}
+          {/* <div className="absolute top-0 right-0 w-32 h-16 bg-gradient-to-bl from-orange-400/90 to-amber-300/10 rounded-bl-full" />
+          <div className="absolute top-0 left-0 w-16 h-40 bg-gradient-to-br from-sky-400/20 to-blue-500/0 rounded-r-full" /> */}
+
+           {/* Top Orange Border */}
+          <div className="absolute top-0 left-0 w-full h-5 bg-orange-400" ></div>
+
+          {/* Top Right Curved Corner */}
+          <div className="absolute top-0 right-0 w-5 h-46 bg-orange-400 rounded-bl-[30px] "></div>
+
+                     {/* Right Side Guide Line */}
+          <div className="absolute right-4 top-[360px] h-25 flex flex-col items-center">
+            <div className="w-2 h-2 rounded-full bg-black"></div>
+            <div className="w-[1.5px]  flex-1 bg-black"></div>
+            {/* <div className="w-[2px] flex-1 bg-gray-500"></div> */}
+          </div>
+
+          {/* Second Guide Line */}
+          <div className="absolute right-4 top-[490px] h-130 flex flex-col items-center">
+            <div className="w-2 h-2 rounded-full bg-black"></div>
+            <div className="w-[2px]  flex-1 bg-black"></div>
+            {/* <div className="w-[2px] flex-1 bg-gray-500"></div> */}
+          </div>
+
+          {/* Left Third Guide Line */}
+          <div className="absolute left-4 top-[790px] h-30 flex flex-col items-center">
+            <div className="w-[2px] flex-1 bg-black"></div>
+            <div className="w-2 h-2 rounded-full bg-black"></div>
+            
+          </div>
+
+
+          
           {/* Header Row: Fallback Logo or Base64 custom Business Logo */}
-          <div className="flex justify-between items-start mb-6">
-            <div className="flex items-center gap-4">
+          <div className="flex justify-between items-start mb-6 mt-6">
+            <div className="flex items-center gap-4 mb-12">
               {invoice.company.companyLogo ? (
                 <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-100 p-1 flex items-center justify-center bg-white shadow-sm">
                   <img src={invoice.company.companyLogo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
@@ -238,7 +341,6 @@ useEffect(() => {
                 <span className="col-span-8 font-mono text-slate-900 font-extrabold tracking-wide">{invoice.invoiceNumber}</span>
               </div>
 
-              
 
               {/* Vendor PAN/GSTIN snapshots */}
               <div className="border-t border-dashed border-slate-200 pt-2 space-y-1 text-[11px]">
@@ -300,6 +402,7 @@ useEffect(() => {
             </div>
 
           </div>
+   
 
           {/* Core breakdown row: Bank details on Left vs Totals column on Right */}
           <div className="grid grid-cols-12 gap-4 border border-slate-900 mb-4 divide-x divide-slate-900 overflow-hidden rounded-sm">
@@ -409,7 +512,7 @@ useEffect(() => {
             
             {/* Address */}
             <div className="col-span-7 flex items-center gap-2">
-              <MapPin className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <Home className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
               <span className="block italic leading-tight text-slate-800 font-medium">{invoice.company.address}</span>
             </div>
 
@@ -427,13 +530,21 @@ useEffect(() => {
                 <Globe className="w-3 h-3 text-indigo-500 shrink-0" />
                 <span className="text-slate-800 truncate">{invoice.company.website}</span>
               </div>
-            </div>
+              {/* Top Orange Border */}
+               <div className="absolute bottom-0 right-0 w-full h-5 bg-blue-400" ></div>
 
+              {/* Top Right Curved Corner */}
+              <div className="absolute bottom-0 left-0 w-5 h-46 bg-blue-400 rounded-tr-[30px]"></div>
+            </div>
+                
+         
           </div>
 
           {/* Accent bottom-left decoration */}
           <div className="absolute bottom-0 left-0 w-32 h-16 bg-gradient-to-tr from-sky-450/30 to-indigo-500/0 rounded-tr-full" />
 
+        </div>
+          </div>
         </div>
 
       </div>
