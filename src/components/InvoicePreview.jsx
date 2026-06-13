@@ -284,17 +284,19 @@ useEffect(() => {
 
           
           {/* Header Row: Fallback Logo or Base64 custom Business Logo */}
-          <div className="flex justify-between items-start mb-6 mt-6">
-            <div className="flex items-center gap-4 mb-12">
+          <div className="flex justify-between items-start mb-6 mt-2">
+            <div className="flex items-center gap-4">
               {invoice.company.companyLogo ? (
-                <div className="w-16 h-16 rounded-xl overflow-hidden border border-slate-100 p-1 flex items-center justify-center bg-white shadow-sm">
+                <div className="w-18 h-18 rounded-xl overflow-hidden border border-slate-100 p-1 flex items-center justify-center bg-white shadow-sm">
                   <img src={invoice.company.companyLogo} alt="Logo" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
                 </div>
               ) : (
                 <FallbackLogo />
               )}
             </div>
+           
           </div>
+           <hr className="border-black my-4 w-full mb-20" />
 
           {/* Section: PROFORMA INVOICE Highlight box */}
           <div className="border border-slate-900 bg-slate-50 p-1 text-center font-bold text-base tracking-wider uppercase mb-5">
