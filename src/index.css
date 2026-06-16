@@ -30,3 +30,102 @@
     color: var(--foreground);
   }
 }
+
+/* Print Styles for Vector PDF Generation */
+@media print {
+  /* Set page format with zero margin, we control margins and scaling via CSS */
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  /* Force background colors to print */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* Hide navigation, sidebars, and utility buttons */
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  /* Reset outer layout boxes only so they don't clip height or block printing */
+  html, body, #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  main {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Reset outer layout flex containers */
+  #root > .flex,
+  #root > .flex > .flex-1 {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Reset the container wrapper styles */
+  .print-reset-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    border: none !important;
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+
+  /* Overwrite the scaled wrapper sizes for print */
+  .print-reset-wrapper {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    position: static !important;
+  }
+
+  /* Remove screen scaling transform during print */
+  .print-reset-scale {
+    transform: none !important;
+    position: static !important;
+  }
+
+  /* Style the invoice container specifically to fit the full A4 canvas */
+  .printable-invoice-area {
+    display: block !important;
+    position: relative !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 32px !important;
+    background: #ffffff !important;
+    box-sizing: border-box !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+
+    /* Remove scale transform so it aligns perfectly to the edges */
+    transform: none !important;
+  }
+}
+

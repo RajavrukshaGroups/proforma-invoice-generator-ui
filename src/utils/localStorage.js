@@ -120,8 +120,8 @@ export const peekNextInvoiceNumber = (dateStr) => {
 export const incrementInvoiceCounter = (dateStr) => {
   const key = getCounterKey(dateStr);
 
-  const count = parseInt(localStorage.getItem(key) || '0', 10) + 1;
-
+  //const count = parseInt(localStorage.getItem(key) || '0', 10) + 1;
+  const count = parseInt(localStorage.getItem(key) || '47', 10) + 1;
   localStorage.setItem(key, count.toString());
 
   const fy = getFinancialYear(dateStr);

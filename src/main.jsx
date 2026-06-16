@@ -4,13 +4,17 @@ import App from './App.jsx';
 import './index.css';
 import { SettingsProvider } from './context/SettingsContext.jsx';
 import { ThemeProvider } from './context/ThemeContext.jsx';
+import { Provider } from 'react-redux';
+import { store } from './store/store.js';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <ThemeProvider>
-      <SettingsProvider>
-        <App />
-      </SettingsProvider>
-    </ThemeProvider>
+    <Provider store={store}>
+      <ThemeProvider>
+        <SettingsProvider>
+          <App />
+        </SettingsProvider>
+      </ThemeProvider>
+    </Provider>
   </React.StrictMode>,
 );

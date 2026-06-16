@@ -26,7 +26,7 @@ const FallbackLogo = () => (
         </linearGradient>
       </defs>
     </svg> */}
-    <img src={Logo} className="w-15 h-full" alt="Logo" />
+    <img src="https://res.cloudinary.com/dxdgk4v3t/image/upload/v1781084316/DES_LOGO4.bd62bce8_ggsd9h.png" className="w-15 h-full" alt="Logo" />
     <div>
       <div className="text-xl font-extrabold tracking-tight text-slate-800 leading-none">Digital</div>
       <div className="text-xs font-semibold  text-slate-600 tracking-wider">Elite Service</div>
@@ -165,17 +165,40 @@ useEffect(() => {
 
   const printableAreaId = `printable-proforma-invoice-${invoice.id}`;
 
-  const handleDownload = async () => {
+  // const handleDownload = async () => {
+  //   setDownloading(true);
+  //   const safeFilename = `${invoice.customer.customerName} - Proforma Invoice`;
+  //   await downloadPDF(printableAreaId, safeFilename);
+  //   setDownloading(false);
+  // };
+    const handleDownload = async () => {
+  try {
     setDownloading(true);
-    const safeFilename = `${invoice.customer.customerName} - Proforma Invoice`;
-    await downloadPDF(printableAreaId, safeFilename);
+
+    const safeFilename =
+      `${invoice.customer.customerName} - Proforma Invoice`;
+
+    await downloadPDF(
+      printableAreaId,
+      safeFilename
+    );
+  } catch (error) {
+    console.error("Download Error:", error);
+
+    alert(
+      error?.response?.data?.message ||
+      error?.message ||
+      "Failed to generate PDF"
+    );
+  } finally {
     setDownloading(false);
-  };
+  }
+};
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-10 w-full max-w-full box-border overflow-x-hidden">
       {/* Control Actions Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-5">
+      <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-5">
         <button
           onClick={handleBack}
           className="inline-flex items-center gap-2 hover:cursor-pointer text-sm font-medium text-slate-650 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
@@ -212,12 +235,12 @@ useEffect(() => {
       >
          */}
       <div
-  ref={containerRef}
-  className="w-full bg-slate-100 dark:bg-slate-950 p-2 sm:p-8 rounded-2xl flex justify-center overflow-x-auto min-h-[600px] shadow-inner"
->
+        ref={containerRef}
+        className="print-reset-container w-full bg-slate-100 dark:bg-slate-950 p-2 sm:p-8 rounded-2xl flex justify-center overflow-x-auto min-h-[600px] shadow-inner"
+      >
         {/* Scaled Wrapper to perfectly fit the A4 dimension within mobile viewports */}
         <div 
-          className="relative transition-all duration-200 ease-out"
+          className="print-reset-wrapper relative transition-all duration-200 ease-out "
           style={{
              width: `${794 * zoomScale}px`,
              height: `${1123 * zoomScale}px`
@@ -227,38 +250,63 @@ useEffect(() => {
             style={{
               transform: `scale(${zoomScale})`,
               transformOrigin: 'top left',
-              // borderTop: "12px solid #f59e0b",
-              // borderRight: "12px solid #f59e0b",
- 
             }}
-            className="absolute top-0 left-0"
+            className="print-reset-scale absolute top-0 left-0"
 
           >
             {/* Printable/A4 Document Block */}
             {/* Force bg-white text-black so it renders beautifully in print mode and Canvas extraction */}
-            <div 
+            {/* <div 
               id={printableAreaId}
-              className="relative bg-white text-slate-900 border border-slate-350 shadow-2xl p-8 pointer-events-auto rounded-none text-[12px] font-sans overflow-hidden print:border-0 print:shadow-none print:p-8"
-              style={{
-                width: '794px',
-                minHeight: '1123px', // standard A4 aspect
-                boxSizing: 'border-box',
-                fontFamily: 'Calibri, "Segoe UI", Roboto, Arial, sans-serif',
+              className="relative bg-white text-slate-900 border border-slate-350 shadow-2xl p-8  pointer-events-auto rounded-none text-[12px] font-sans overflow-hidden print:border-0 print:shadow-none print:p-8"
+    //           style={{
+    //             width: '794px',
+    //             minHeight: '1123px', // standard A4 aspect
+
+    //             // width: '694px',
+    //             // minHeight: '1123px', // standard A4 aspect
+    //             boxSizing: 'border-box',
+    //             fontFamily: 'Calibri, "Segoe UI", Roboto, Arial, sans-serif',
              
-    // borderTop: "12px solid #f59e0b",
-    // borderRight: "12px solid #f59e0b",
+    // // borderTop: "12px solid #f59e0b",
+    // // borderRight: "12px solid #f59e0b",
  
-              }}
-            >
+    //           }}
+    style={{
+  width: '794px',
+  minHeight: '1122px', // exact A4 ratio at 96 DPI
+  boxSizing: 'border-box',
+  fontFamily: 'Calibri, "Segoe UI", Roboto, Arial, sans-serif',
+}}
+            > */}
+
+
+
+                <div
+  id={printableAreaId}
+  className="printable-invoice-area relative bg-white text-slate-900 border border-slate-350 shadow-2xl p-8 pointer-events-auto rounded-none text-[12px] font-sans print:border-0 print:shadow-none print:p-8"
+  style={{
+    width: "794px",
+    minHeight: "1122px",
+    height: "auto",
+    overflow: "visible",
+    boxSizing: "border-box",
+    fontFamily: 'Calibri, "Segoe UI", Roboto, Arial, sans-serif',
+  }}
+>
+
+
+
+
           {/* Accent top decoration matching "Digital Elite Service" banner vibes */}
           {/* <div className="absolute top-0 right-0 w-32 h-16 bg-gradient-to-bl from-orange-400/90 to-amber-300/10 rounded-bl-full" />
           <div className="absolute top-0 left-0 w-16 h-40 bg-gradient-to-br from-sky-400/20 to-blue-500/0 rounded-r-full" /> */}
 
            {/* Top Orange Border */}
-          <div className="absolute top-0 left-0 w-full h-5 bg-orange-400" ></div>
+          <div className="absolute top-0 left-0 w-full h-7 bg-orange-400" ></div>
 
           {/* Top Right Curved Corner */}
-          <div className="absolute top-0 right-0 w-5 h-46 bg-orange-400 rounded-bl-[30px] "></div>
+          <div className="absolute top-0 right-0 w-7 h-46 bg-orange-400 rounded-bl-[30px] "></div>
 
                      {/* Right Side Guide Line */}
           <div className="absolute right-4 top-[360px] h-25 flex flex-col items-center">
@@ -268,14 +316,14 @@ useEffect(() => {
           </div>
 
           {/* Second Guide Line */}
-          <div className="absolute right-4 top-[490px] h-130 flex flex-col items-center">
+          <div className="absolute right-4 top-[490px] h-110 flex flex-col items-center">
             <div className="w-2 h-2 rounded-full bg-black"></div>
             <div className="w-[2px]  flex-1 bg-black"></div>
             {/* <div className="w-[2px] flex-1 bg-gray-500"></div> */}
           </div>
 
           {/* Left Third Guide Line */}
-          <div className="absolute left-4 top-[790px] h-30 flex flex-col items-center">
+          <div className="absolute left-4 top-[690px] h-30 flex flex-col items-center">
             <div className="w-[2px] flex-1 bg-black"></div>
             <div className="w-2 h-2 rounded-full bg-black"></div>
             
@@ -284,7 +332,7 @@ useEffect(() => {
 
           
           {/* Header Row: Fallback Logo or Base64 custom Business Logo */}
-          <div className="flex justify-between items-start mb-6 mt-2">
+          <div className="flex justify-between items-start mb-6 mt-4">
             <div className="flex items-center gap-4">
               {invoice.company.companyLogo ? (
                 <div className="w-18 h-18 rounded-xl overflow-hidden border border-slate-100 p-1 flex items-center justify-center bg-white shadow-sm">
@@ -296,10 +344,10 @@ useEffect(() => {
             </div>
            
           </div>
-           <hr className="border-black my-4 w-full mb-20" />
+           <hr className="border-black my-4 w-full mb-6" />
 
           {/* Section: PROFORMA INVOICE Highlight box */}
-          <div className="border border-slate-900 bg-slate-50 p-1 text-center font-bold text-base tracking-wider uppercase mb-5">
+          <div className="border border-slate-900 bg-slate-50 p-1 text-center font-bold text-base tracking-wider uppercase mb-3">
             PROFORMA INVOICE
           </div>
 
@@ -362,7 +410,7 @@ useEffect(() => {
           </div>
 
           {/* Service items table */}
-          <div className="border border-slate-900 mb-5 rounded-sm overflow-hidden">
+          <div className="border border-slate-900 mb-3 rounded-sm overflow-hidden">
             
             {/* Table Header */}
             <div className="grid grid-cols-12 border-b border-slate-900 bg-slate-50 font-bold text-slate-850 uppercase text-center text-[11px] select-none">
@@ -388,7 +436,7 @@ useEffect(() => {
                     {/* Quantity / timeframe col */}
                     <div className="col-span-2 py-3 px-2 border-r border-slate-900 flex flex-col items-center justify-center font-mono text-center">
                       <span className="font-bold text-sm leading-none">{item.timeFrame}</span>
-                      <span className="text-[8px] text-slate-500 font-sans tracking-widest uppercase mt-1">{item.timeFrameUnit === 'Quantity' ? 'Qty' : (item.timeFrameUnit || 'Months')}</span>
+                      <span className="text-[8px] text-slate-900 font-sans tracking-widest uppercase mt-1">{item.timeFrameUnit === 'Quantity' ? 'Qty' : (item.timeFrameUnit || 'Months')}</span>
                     </div>
 
                     {/* Numeric Amount col */}
@@ -407,7 +455,7 @@ useEffect(() => {
    
 
           {/* Core breakdown row: Bank details on Left vs Totals column on Right */}
-          <div className="grid grid-cols-12 gap-4 border border-slate-900 mb-4 divide-x divide-slate-900 overflow-hidden rounded-sm">
+          <div className="grid grid-cols-12 gap-4 border border-slate-900 mb-3 divide-x divide-slate-900 overflow-hidden rounded-sm">
             
             {/* Bank details widget */}
             <div className="col-span-6 p-3 bg-white space-y-1.5 flex flex-col justify-center">
@@ -470,7 +518,7 @@ useEffect(() => {
           </div>
 
           {/* Amount In Words Row */}
-          <div className="border border-slate-900 bg-slate-50 px-4 py-2.5 text-slate-900 text-xs font-bold font-serif mb-5 flex items-center justify-center">
+          <div className="border border-slate-900 bg-slate-50 px-4 py-2.5 text-slate-900 text-xs font-bold font-serif mb-3 flex items-center justify-center">
             {invoice.amountInWords}
           </div>
 
@@ -510,7 +558,7 @@ useEffect(() => {
           </div>
 
           {/* Small designer frame footer */}
-          <div className="mt-8 border-t border-slate-100 pt-4 grid grid-cols-12 items-center text-[10.5px] text-slate-500">
+          <div className="mt-3 border-t border-slate-100 pt-3 grid grid-cols-12 items-center text-[10.5px] text-slate-500">
             
             {/* Address */}
             <div className="col-span-7 flex items-center gap-2">
@@ -532,18 +580,17 @@ useEffect(() => {
                 <Globe className="w-3 h-3 text-indigo-500 shrink-0" />
                 <span className="text-slate-800 truncate">{invoice.company.website}</span>
               </div>
-              {/* Top Orange Border */}
-               <div className="absolute bottom-0 right-0 w-full h-5 bg-blue-400" ></div>
-
-              {/* Top Right Curved Corner */}
-              <div className="absolute bottom-0 left-0 w-5 h-46 bg-blue-400 rounded-tr-[30px]"></div>
             </div>
-                
-         
           </div>
 
           {/* Accent bottom-left decoration */}
           <div className="absolute bottom-0 left-0 w-32 h-16 bg-gradient-to-tr from-sky-450/30 to-indigo-500/0 rounded-tr-full" />
+
+          {/* Bottom Blue Border */}
+          <div className="absolute bottom-0 right-0 w-full h-7 bg-blue-400" ></div>
+
+          {/* Bottom Left Curved Corner */}
+          <div className="absolute bottom-0 left-0 w-7 h-46 bg-blue-400 rounded-tr-[30px]"></div>
 
         </div>
           </div>
