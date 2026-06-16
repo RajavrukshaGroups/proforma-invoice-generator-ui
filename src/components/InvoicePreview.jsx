@@ -196,7 +196,7 @@ useEffect(() => {
 };
 
   return (
-    <div className="space-y-4 sm:space-y-6 p-4 sm:p-10 w-full max-w-full box-border overflow-x-hidden">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-10 w-full max-w-full box-border overflow-x-hidden print:p-0 print:m-0 print:space-y-0">
       {/* Control Actions Header */}
       <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-5">
         <button
@@ -505,7 +505,7 @@ useEffect(() => {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-12 py-2.5 px-3 bg-slate-50 font-extrabold text-[13px] text-slate-900">
+                <div className="grid grid-cols-12 py-2.5 px-3 bg-slate-50 font-black text-[15px] text-slate-900">
                   <span className="col-span-7 uppercase">TOTAL</span>
                   <span className="col-span-5 font-extrabold text-right font-mono text-indigo-700">
                     {formatIndianCurrency(invoice.grandTotal)}
