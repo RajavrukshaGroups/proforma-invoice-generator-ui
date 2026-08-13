@@ -231,11 +231,10 @@ export default function InvoicePreview({
   /* ------------------------------------------------------------------------ */
 
   return (
-    <div className="w-full max-w-full space-y-4 overflow-x-hidden p-4 sm:space-y-6 sm:p-10 print:m-0 print:p-0">
+    <div className="invoice-page-root w-full max-w-full space-y-4 overflow-x-hidden p-4 sm:space-y-6 sm:p-10 print:m-0 print:p-0">
       {/* ================================================================ */}
       {/* ACTION BAR                                                      */}
       {/* ================================================================ */}
-
       <div className="no-print flex flex-col justify-between gap-4 border-b border-gray-200 pb-5 sm:flex-row sm:items-center dark:border-gray-800">
         <button
           onClick={handleBack}
@@ -270,11 +269,9 @@ export default function InvoicePreview({
           </button>
         </div>
       </div>
-
       {/* ================================================================ */}
       {/* PREVIEW CONTAINER                                                */}
       {/* ================================================================ */}
-
       <div
         ref={containerRef}
         className="print-reset-container flex min-h-[600px] w-full justify-center overflow-x-auto rounded-2xl bg-slate-100 p-2 shadow-inner sm:p-8 print:m-0 print:bg-white print:p-0 print:shadow-none"
@@ -1246,15 +1243,25 @@ export default function InvoicePreview({
                 {/* ====================================================== */}
 
                 <div
+                  // style={{
+                  //   minHeight: "96px",
+                  //   padding: "0 28px 16px 28px",
+                  //   boxSizing: "border-box",
+                  //   fontFamily: "Arial, Helvetica, sans-serif",
+                  //   display: "grid",
+                  //   gridTemplateColumns: "62% 38%",
+                  //   alignItems: "center",
+                  //   // columnGap: "18px",
+                  //   columnGap: "90px",
+                  // }}
                   style={{
                     minHeight: "96px",
                     padding: "0 28px 16px 28px",
                     boxSizing: "border-box",
                     fontFamily: "Arial, Helvetica, sans-serif",
                     display: "grid",
-                    gridTemplateColumns: "62% 38%",
+                    gridTemplateColumns: "60% 40%",
                     alignItems: "center",
-                    // columnGap: "18px",
                     columnGap: "90px",
                   }}
                 >
