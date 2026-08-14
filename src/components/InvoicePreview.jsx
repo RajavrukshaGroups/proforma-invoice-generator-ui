@@ -477,7 +477,8 @@ export default function InvoicePreview({
 
                 {/* Controlled spacing between divider and invoice title */}
 
-                <div style={{ height: "72px" }} />
+                {/* <div style={{ height: "72px" }} /> */}
+                <div style={{ height: "50px" }} />
 
                 {/* ====================================================== */}
                 {/* PROFORMA TITLE                                        */}
@@ -509,7 +510,8 @@ export default function InvoicePreview({
                   style={{
                     display: "grid",
                     gridTemplateColumns: "52% 48%",
-                    minHeight: "162px",
+                    // minHeight: "162px",
+                    minHeight: "145px",
                     borderLeft: "1px solid #111",
                     borderRight: "1px solid #111",
                     boxSizing: "border-box",
@@ -519,7 +521,8 @@ export default function InvoicePreview({
 
                   <div
                     style={{
-                      padding: "22px 18px 12px 14px",
+                      // padding: "22px 18px 12px 14px",
+                      padding: "15px 14px 10px 12px",
                       boxSizing: "border-box",
                       display: "flex",
                       flexDirection: "column",
@@ -571,7 +574,8 @@ export default function InvoicePreview({
                       <div
                         style={{
                           marginTop: "auto",
-                          paddingTop: "20px",
+                          // paddingTop: "20px",
+                          paddingTop: "12px",
                           fontSize: "12px",
                           lineHeight: 1.2,
                         }}
@@ -585,7 +589,8 @@ export default function InvoicePreview({
 
                   <div
                     style={{
-                      padding: "22px 14px 12px 22px",
+                      // padding: "22px 14px 12px 22px",
+                      padding: "15px 12px 10px 18px",
                       boxSizing: "border-box",
                       display: "flex",
                       flexDirection: "column",
@@ -766,7 +771,8 @@ export default function InvoicePreview({
                       >
                         <div
                           style={{
-                            padding: "12px 0",
+                            // padding: "12px 0",
+                            padding: "7px 0",
                           }}
                         >
                           {items.length > 0 ? (
@@ -774,8 +780,10 @@ export default function InvoicePreview({
                               <div
                                 key={item.id || item._id || index}
                                 style={{
-                                  minHeight: "24px",
-                                  padding: "4px 10px",
+                                  // minHeight: "24px",
+                                  // padding: "4px 10px",
+                                  minHeight: "21px",
+                                  padding: "3px 8px",
                                   boxSizing: "border-box",
                                   display: "flex",
                                   alignItems: "center",
@@ -820,7 +828,8 @@ export default function InvoicePreview({
                       <td
                         style={{
                           border: "1px solid #111",
-                          padding: "12px 6px",
+                          // padding: "12px 6px",
+                          padding: "8px 6px",
                           textAlign: "center",
                           verticalAlign: "middle",
                           fontSize: "13px",
@@ -834,7 +843,8 @@ export default function InvoicePreview({
                       <td
                         style={{
                           border: "1px solid #111",
-                          padding: "12px 12px",
+                          // padding: "12px 12px",
+                          padding: "8px 10px",
                           textAlign: "center",
                           verticalAlign: "middle",
                           fontSize: "13px",
@@ -852,7 +862,8 @@ export default function InvoicePreview({
                       <td
                         style={{
                           border: "1px solid #111",
-                          padding: "8px 10px",
+                          // padding: "8px 10px",
+                          padding: "6px 8px",
                           fontWeight: 700,
                           fontSize: "13px",
                           verticalAlign: "middle",
@@ -905,10 +916,13 @@ export default function InvoicePreview({
                         style={{
                           border: "1px solid #111",
                           padding: "7px 10px",
+                          // padding: "5px 8px",
+
                           verticalAlign: "top",
                           fontWeight: 700,
                           fontSize: "12px",
                           lineHeight: 1.45,
+                          // lineHeight: 1.3,
                         }}
                       >
                         <div>
@@ -942,7 +956,8 @@ export default function InvoicePreview({
                       <td
                         style={{
                           border: "1px solid #111",
-                          padding: "5px 10px",
+                          // padding: "5px 10px",
+                          padding: "4px 8px",
                           verticalAlign: "middle",
                         }}
                       >
@@ -969,7 +984,8 @@ export default function InvoicePreview({
                       <td
                         style={{
                           border: "1px solid #111",
-                          padding: "5px 10px",
+                          // padding: "5px 10px",
+                          padding: "4px 8px",
                           verticalAlign: "middle",
                         }}
                       >
@@ -996,7 +1012,8 @@ export default function InvoicePreview({
                       <td
                         style={{
                           border: "1px solid #111",
-                          padding: "6px 10px",
+                          // padding: "6px 10px",
+                          padding: "5px 8px",
                           verticalAlign: "middle",
                           fontWeight: 700,
                         }}
@@ -1026,8 +1043,10 @@ export default function InvoicePreview({
                         colSpan={2}
                         style={{
                           border: "1px solid #111",
-                          height: "52px",
-                          padding: "8px 16px",
+                          // height: "52px",
+                          // height: "40px",
+                          // padding: "8px 16px",
+                          padding: "6px 12px",
                           textAlign: "center",
                           verticalAlign: "middle",
                           fontWeight: 700,
@@ -1055,11 +1074,13 @@ export default function InvoicePreview({
                   {/* Heading */}
                   <div
                     style={{
-                      minHeight: "34px",
+                      // minHeight: "34px",
+                      minHeight: "28px",
                       borderBottom: "1px solid #111",
                       display: "flex",
                       alignItems: "center",
-                      padding: "7px 10px",
+                      // padding: "7px 10px",
+                      padding: "5px 8px",
                       boxSizing: "border-box",
                       fontSize: "13px",
                       fontWeight: 700,
@@ -1076,17 +1097,19 @@ export default function InvoicePreview({
                         <div
                           key={index}
                           style={{
-                            minHeight: "36px",
+                            // minHeight: "36px",
+                            // minHeight: "29px",
                             borderBottom:
                               index === terms.length - 1
                                 ? "none"
                                 : "1px solid #111",
                             display: "flex",
                             alignItems: "center",
-                            padding: "8px 10px",
+                            // padding: "8px 10px",
+                            padding: "5px 8px",
                             boxSizing: "border-box",
                             fontSize: "12px",
-                            lineHeight: 1.35,
+                            lineHeight: 1.25,
                             overflowWrap: "break-word",
                             wordBreak: "normal",
                           }}
@@ -1189,13 +1212,15 @@ export default function InvoicePreview({
 
                 <div
                   style={{
-                    minHeight: "40px",
+                    // minHeight: "40px",
+                    minHeight: "32px",
                     borderLeft: "1px solid #111",
                     borderRight: "1px solid #111",
                     borderBottom: "1px solid #111",
                     display: "flex",
                     alignItems: "center",
-                    padding: "8px 10px",
+                    // padding: "8px 10px",
+                    padding: "5px 8px",
                     boxSizing: "border-box",
                     fontSize: "12px",
                     lineHeight: 1.3,
@@ -1214,14 +1239,16 @@ export default function InvoicePreview({
 
                 <div
                   style={{
-                    minHeight: "32px",
+                    // minHeight: "32px",
+                    minHeight: "27px",
                     borderLeft: "1px solid #111",
                     borderRight: "1px solid #111",
                     borderBottom: "1px solid #111",
                     display: "flex",
                     justifyContent: "center",
                     alignItems: "center",
-                    padding: "5px 10px",
+                    // padding: "5px 10px",
+                    padding: "4px 8px",
                     boxSizing: "border-box",
                     fontWeight: 700,
                     fontStyle: "italic",
@@ -1254,9 +1281,19 @@ export default function InvoicePreview({
                   //   // columnGap: "18px",
                   //   columnGap: "90px",
                   // }}
+                  // style={{
+                  //   minHeight: "96px",
+                  //   padding: "0 28px 16px 28px",
+                  //   boxSizing: "border-box",
+                  //   fontFamily: "Arial, Helvetica, sans-serif",
+                  //   display: "grid",
+                  //   gridTemplateColumns: "60% 40%",
+                  //   alignItems: "center",
+                  //   columnGap: "90px",
+                  // }}
                   style={{
-                    minHeight: "96px",
-                    padding: "0 28px 16px 28px",
+                    minHeight: "82px",
+                    padding: "0 22px 10px 22px",
                     boxSizing: "border-box",
                     fontFamily: "Arial, Helvetica, sans-serif",
                     display: "grid",
@@ -1271,9 +1308,10 @@ export default function InvoicePreview({
                     style={{
                       display: "flex",
                       alignItems: "center",
-                      gap: "14px",
+                      gap: "7px",
                       minWidth: 0,
-                      marginTop: "1rem",
+                      // marginTop: "1rem",
+                      marginTop: "4px",
                     }}
                   >
                     <Home
