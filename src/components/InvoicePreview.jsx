@@ -734,9 +734,15 @@ export default function InvoicePreview({
                           lineHeight: 1.1,
                         }}
                       >
-                        Time Frame
-                        <br />
-                        in months
+                        {items?.[0]?.timeFrameUnit === "Quantity" ? (
+                          "SERVICE QTY"
+                        ) : (
+                          <>
+                            Time Frame
+                            <br />
+                            in months
+                          </>
+                        )}
                       </th>
 
                       <th
