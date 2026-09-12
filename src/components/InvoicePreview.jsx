@@ -12,6 +12,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { downloadPDF, triggerPrint } from "../utils/pdfGenerator";
 import API from "../api/axios";
+import LogoImg from "../assets/logo.png"
 
 /* -------------------------------------------------------------------------- */
 /*                                  HELPERS                                   */
@@ -21,7 +22,8 @@ const FallbackLogo = () => (
   <div className="flex items-center gap-2">
     <img
       // src="https://res.cloudinary.com/dxdgk4v3t/image/upload/v1781084316/DES_LOGO4.bd62bce8_ggsd9h.png"
-      src="https://res.cloudinary.com/dxdgk4v3t/image/upload/v1786604770/DES_NEW_LOGO_l2fisv.png"
+      //src="https://res.cloudinary.com/dxdgk4v3t/image/upload/v1786604770/DES_NEW_LOGO_l2fisv.png"
+      src={LogoImg}
       className="h-[58px] w-auto object-contain"
       alt="Digital Elite Service"
     />
