@@ -21,8 +21,6 @@ import LogoImg from "../assets/logo.png"
 const FallbackLogo = () => (
   <div className="flex items-center gap-2">
     <img
-      // src="https://res.cloudinary.com/dxdgk4v3t/image/upload/v1781084316/DES_LOGO4.bd62bce8_ggsd9h.png"
-      //src="https://res.cloudinary.com/dxdgk4v3t/image/upload/v1786604770/DES_NEW_LOGO_l2fisv.png"
       src={LogoImg}
       className="h-[58px] w-auto object-contain"
       alt="Digital Elite Service"
@@ -443,7 +441,8 @@ export default function InvoicePreview({
                   <div className="flex items-center">
                     {company.companyLogo ? (
                       <img
-                        src={company.companyLogo}
+                        //src={company.companyLogo}
+                        src={LogoImg}
                         alt={company.companyName || "Company"}
                         referrerPolicy="no-referrer"
                         style={{
@@ -456,7 +455,7 @@ export default function InvoicePreview({
                       />
                     ) : (
                       <img
-                        src="https://res.cloudinary.com/dxdgk4v3t/image/upload/v1786604770/DES_NEW_LOGO_l2fisv.png"
+                        src={LogoImg}
                         alt="Logo"
                         style={{
                           width: "180px",
