@@ -1,4 +1,5 @@
 import { createSlice } from '@reduxjs/toolkit';
+import { getStoredTerms, saveStoredTerms } from '../../utils/localStorage';
 
 export const DEFAULT_TERMS = [
   'Payment must be made within 15 days of the invoice date.',
@@ -20,7 +21,8 @@ const initialState = {
     phone: '+91 63669 30178',
     email: 'info@digitaleliteservices.in',
     website: 'www.digitaleliteservices.in'
-  }
+  },
+  terms: getStoredTerms()
 };
 
 const settingsSlice = createSlice({
@@ -29,12 +31,31 @@ const settingsSlice = createSlice({
   reducers: {
     updateCompanySettings: (state, action) => {
       state.companySettings = { ...state.companySettings, ...action.payload };
+      if (Array.isArray(action.payload?.terms)) {
+        state.terms = action.payload.terms;
+        saveStoredTerms(action.payload.terms);
+      }
+    },
+    updateTerms: (state, action) => {
+      if (Array.isArray(action.payload)) {
+        state.terms = action.payload;
+        saveStoredTerms(action.payload);
+      }
+    },
+    resetTerms: (state) => {
+      state.terms = DEFAULT_TERMS;
+      saveStoredTerms(DEFAULT_TERMS);
     }
   }
 });
 
-export const { updateCompanySettings } = settingsSlice.actions;
+export const { updateCompanySettings, updateTerms, resetTerms } = settingsSlice.actions;
 
-export const selectCompanySettings = (state) => state.settings.companySettings;
+export const selectCompanySettings = (state) => ({
+  ...state.settings.companySettings,
+  terms: state.settings.terms || DEFAULT_TERMS
+});
+export const selectTerms = (state) => state.settings.terms || DEFAULT_TERMS;
 
 export default settingsSlice.reducer;
+

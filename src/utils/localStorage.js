@@ -28,10 +28,58 @@ export const deleteInvoice = (id) => {
   localStorage.setItem(INVOICES_KEY, JSON.stringify(updated));
 };
 
+export const TERMS_STORAGE_KEY = 'pi_terms';
+export const TERMS_UPDATED_AT_KEY = 'pi_terms_updated_at';
+
+export const getStoredTerms = () => {
+  if (typeof window === 'undefined') return DEFAULT_TERMS;
+  try {
+    const rawTerms = localStorage.getItem(TERMS_STORAGE_KEY);
+    if (rawTerms) {
+      const parsed = JSON.parse(rawTerms);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+    const rawSettings = localStorage.getItem('pi_settings');
+    if (rawSettings) {
+      const parsedSettings = JSON.parse(rawSettings);
+      if (Array.isArray(parsedSettings?.terms) && parsedSettings.terms.length > 0) {
+        return parsedSettings.terms;
+      }
+    }
+  } catch (e) {
+    console.error('Failed to parse stored terms', e);
+  }
+  return DEFAULT_TERMS;
+};
+
+export const saveStoredTerms = (terms) => {
+  if (typeof window === 'undefined' || !Array.isArray(terms)) return;
+  try {
+    localStorage.setItem(TERMS_STORAGE_KEY, JSON.stringify(terms));
+    localStorage.setItem(TERMS_UPDATED_AT_KEY, Date.now().toString());
+    const rawSettings = localStorage.getItem('pi_settings');
+    if (rawSettings) {
+      const parsed = JSON.parse(rawSettings);
+      parsed.terms = terms;
+      localStorage.setItem('pi_settings', JSON.stringify(parsed));
+    }
+  } catch (e) {
+    console.error('Failed to save terms', e);
+  }
+};
+
 export const getCompanySettings = () => {
   try {
     const data = localStorage.getItem('pi_settings');
-    if (data) return JSON.parse(data);
+    if (data) {
+      const parsed = JSON.parse(data);
+      return {
+        ...parsed,
+        terms: getStoredTerms()
+      };
+    }
   } catch (e) {
     console.error('Failed to parse company settings', e);
   }
@@ -47,12 +95,16 @@ export const getCompanySettings = () => {
     branch: 'SAHAKAR NAGAR',
     phone: '+91 63669 30178',
     email: 'info@digitaleliteservices.in',
-    website: 'www.digitaleliteservices.in'
+    website: 'www.digitaleliteservices.in',
+    terms: getStoredTerms()
   };
 };
 
 export const saveCompanySettings = (settings) => {
   localStorage.setItem('pi_settings', JSON.stringify(settings));
+  if (Array.isArray(settings?.terms)) {
+    saveStoredTerms(settings.terms);
+  }
 };
 
 export const getInvoices = () => {
@@ -110,22 +162,31 @@ const getFinancialYear = (dateStr) => {
 
 export const peekNextInvoiceNumber = (dateStr) => {
   const key = getCounterKey(dateStr);
-  const count = parseInt(localStorage.getItem(key) || '0', 10) + 1;
-
+  const count = parseInt(localStorage.getItem(key) || '47', 10) + 1;
   const fy = getFinancialYear(dateStr);
-
   return `DES/PI/${String(count).padStart(4, '0')}/${fy}`;
 };
 
-export const incrementInvoiceCounter = (dateStr) => {
+export const incrementInvoiceCounter = (dateStr, createdInvoiceNumber) => {
   const key = getCounterKey(dateStr);
+  let count = parseInt(localStorage.getItem(key) || '47', 10);
 
-  //const count = parseInt(localStorage.getItem(key) || '0', 10) + 1;
-  const count = parseInt(localStorage.getItem(key) || '47', 10) + 1;
+  if (createdInvoiceNumber) {
+    const m = createdInvoiceNumber.match(/DES\/PI\/(\d+)/i) || createdInvoiceNumber.match(/\/(\d+)(?:\/|$)/);
+    if (m) {
+      const parsedNum = parseInt(m[1], 10);
+      if (!isNaN(parsedNum)) {
+        count = Math.max(count, parsedNum);
+        localStorage.setItem(key, count.toString());
+        const fy = getFinancialYear(dateStr);
+        return `DES/PI/${String(count).padStart(4, '0')}/${fy}`;
+      }
+    }
+  }
+
+  count += 1;
   localStorage.setItem(key, count.toString());
-
   const fy = getFinancialYear(dateStr);
-
   return `DES/PI/${String(count).padStart(4, '0')}/${fy}`;
 };
 

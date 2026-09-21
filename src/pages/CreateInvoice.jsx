@@ -4,8 +4,9 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useDispatch, useSelector } from 'react-redux';
-import { addOrUpdateInvoice, incrementCounter, clearDraft, saveDraft, selectDraft, selectNextInvoiceNumber } from '../store/slices/invoiceSlice';
-import { selectCompanySettings, updateCompanySettings, DEFAULT_TERMS } from '../store/slices/settingsSlice';
+import { addOrUpdateInvoice, incrementCounter, recordInvoiceCreated, syncMaxCounter, clearDraft, saveDraft, selectDraft, selectNextInvoiceNumber, getFinancialYear } from '../store/slices/invoiceSlice';
+import { selectCompanySettings, updateCompanySettings, selectTerms, updateTerms, DEFAULT_TERMS } from '../store/slices/settingsSlice';
+import { getStoredTerms, saveStoredTerms, TERMS_UPDATED_AT_KEY } from '../utils/localStorage';
 import { calculateGST } from '../utils/calculations';
 import { store } from '../store/store';
 import { Plus, Trash, Save, FileText, Check, AlertTriangle, RefreshCcw } from 'lucide-react';
@@ -57,10 +58,43 @@ export default function CreateInvoice() {
   
   // Custom states outside the schema for bank details snap and manual T&C
   const companySnapshot = useSelector(selectCompanySettings);
-  const [terms, setTerms] = useState(DEFAULT_TERMS);
+  const defaultTerms = useSelector(selectTerms);
+  const [terms, setTerms] = useState(() => getStoredTerms());
   const [newTerm, setNewTerm] = useState('');
   const [draftRestored, setDraftRestored] = useState(false);
   const [toast, setToast] = useState(null);
+
+  useEffect(() => {
+    if (!isEditMode && defaultTerms && defaultTerms.length > 0) {
+      setTerms(defaultTerms);
+    }
+  }, [defaultTerms, isEditMode]);
+
+  // Sync settings and terms from backend on mount so new browsers/tabs get persisted terms
+  useEffect(() => {
+    if (isEditMode) return;
+    API.get('/getSettings')
+      .then((res) => {
+        const payload = res.data;
+        const list = Array.isArray(payload?.data)
+          ? payload.data
+          : (Array.isArray(payload) ? payload : []);
+
+        if (list.length > 0) {
+          const latest = list[0];
+          const currentStored = getStoredTerms();
+          const safeTerms = Array.isArray(latest.terms) && latest.terms.length > 0
+            ? latest.terms
+            : currentStored;
+
+          saveStoredTerms(safeTerms);
+          dispatch(updateTerms(safeTerms));
+          setTerms(safeTerms);
+          dispatch(updateCompanySettings({ ...latest, terms: safeTerms }));
+        }
+      })
+      .catch(() => {});
+  }, [isEditMode, dispatch]);
 
   // Default dates: Today and Today + 30 days
   const getTodayStr = () => {
@@ -154,6 +188,49 @@ export default function CreateInvoice() {
     }
   }, [watchedDate, isEditMode, store]);
 
+  // Sync highest sequential counter from existing database invoices
+  useEffect(() => {
+    if (isEditMode) return;
+    let isCancelled = false;
+    API.get('/getAllPI')
+      .then((res) => {
+        if (isCancelled) return;
+        const data = res.data;
+        if (data && data.success && Array.isArray(data.data)) {
+          const invDate = watchedDate || getTodayStr();
+          const targetFy = getFinancialYear(invDate);
+          const key = `invoice_counter_${targetFy}`;
+          let maxCount = 0;
+
+          data.data.forEach((inv) => {
+            if (inv.invoiceNumber) {
+              const m = inv.invoiceNumber.match(/DES\/PI\/(\d+)(?:\/(\d{4}-\d{2}))?/i) || inv.invoiceNumber.match(/\/(\d+)(?:\/|$)/);
+              if (m) {
+                const count = parseInt(m[1], 10);
+                const invFy = m[2];
+                if (!invFy || invFy === targetFy) {
+                  if (!isNaN(count) && count > maxCount) {
+                    maxCount = count;
+                  }
+                }
+              }
+            }
+          });
+
+          if (maxCount > 0) {
+            dispatch(syncMaxCounter({ key, maxCount }));
+            const freshNext = `DES/PI/${String(maxCount + 1).padStart(4, '0')}/${targetFy}`;
+            setInvoiceNumber(freshNext);
+          }
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isEditMode, watchedDate, dispatch]);
+
   // Watch form fields for live auto-calculations
   const watchedItems = watch('items');
   const watchedGstMode = watch('gstMode');
@@ -200,7 +277,7 @@ export default function CreateInvoice() {
   const handleDiscardDraft = () => {
     dispatch(clearDraft());
     reset(defaultFormValues);
-    setTerms(DEFAULT_TERMS);
+    setTerms(getStoredTerms());
     // companySnapshot will reflect default via selector
     const nextNo = selectNextInvoiceNumber(store.getState(), getTodayStr());
     setInvoiceNumber(nextNo);
@@ -208,16 +285,35 @@ export default function CreateInvoice() {
     showToast('success', 'Form draft cleared successfully.');
   };
 
-  // Terms and conditions helpers
+  // Terms and conditions helpers - permanently persist added/removed clauses and maintain in Redux
   const handleAddTerm = () => {
-    if (newTerm.trim()) {
-      setTerms(prev => [...prev, newTerm.trim()]);
+    const trimmed = newTerm.trim();
+    if (trimmed) {
+      const updated = [...terms, trimmed];
+      setTerms(updated);
+      if (!isEditMode) {
+        saveStoredTerms(updated);
+        dispatch(updateTerms(updated));
+        dispatch(updateCompanySettings({ terms: updated }));
+        API.post('/saveSettings', { terms: updated }).catch(() => {});
+      }
       setNewTerm('');
     }
   };
 
   const handleRemoveTerm = (index) => {
-    setTerms(prev => prev.filter((_, i) => i !== index));
+    if (terms.length <= 1) {
+      showToast('warn', 'At least one Terms & Conditions clause is mandatory.');
+      return;
+    }
+    const updated = terms.filter((_, i) => i !== index);
+    setTerms(updated);
+    if (!isEditMode) {
+      saveStoredTerms(updated);
+      dispatch(updateTerms(updated));
+      dispatch(updateCompanySettings({ terms: updated }));
+      API.post('/saveSettings', { terms: updated }).catch(() => {});
+    }
   };
 
   const handleCancel = () => {
@@ -240,6 +336,12 @@ const onSubmit = async (data) => {
       showToast('warn', 'Invalid PAN format');
       return;
     }
+  }
+
+  // Terms & Conditions mandatory validation
+  if (!terms || terms.length === 0) {
+    showToast('warn', 'At least one Terms & Conditions clause is mandatory.');
+    return;
   }
 
   const payload = {
@@ -294,8 +396,19 @@ const onSubmit = async (data) => {
       throw new Error(result.message || "Create failed");
     }
 
-    // Increment local counter so the next invoice has a new unique number
-    dispatch(incrementCounter(data.invoiceDate));
+    // Record created invoice number to automatically increment and store next counter (e.g. 0076 -> 0077)
+    dispatch(recordInvoiceCreated({
+      invoiceNumber: payload.invoiceNumber,
+      invoiceDate: data.invoiceDate
+    }));
+
+    // Maintain terms in Redux even for newly created invoices
+    if (terms && terms.length > 0) {
+      saveStoredTerms(terms);
+      dispatch(updateTerms(terms));
+      dispatch(updateCompanySettings({ terms }));
+    }
+    dispatch(clearDraft());
 
     showToast("success", "Invoice created successfully");
 
@@ -538,8 +651,9 @@ const onSubmit = async (data) => {
 
             {/* Box 3: Custom Terms and Conditions */}
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-3 mb-4 uppercase tracking-wider">
-                Terms &amp; Conditions
+              <h2 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-3 mb-4 uppercase tracking-wider flex items-center justify-between">
+                <span>Terms &amp; Conditions <span className="text-rose-500 font-bold">*</span></span>
+                <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 normal-case tracking-normal">Mandatory &amp; Maintained in Redux</span>
               </h2>
               
               <div className="space-y-3 mb-4">
@@ -550,7 +664,9 @@ const onSubmit = async (data) => {
                     <button
                       type="button"
                       onClick={() => handleRemoveTerm(i)}
-                      className="text-xs text-red-600 hover:text-rose-500 font-medium hover:cursor-pointer"
+                      disabled={terms.length <= 1}
+                      className="text-xs text-red-600 hover:text-rose-500 disabled:opacity-25 disabled:pointer-events-none font-medium hover:cursor-pointer transition-colors"
+                      title={terms.length <= 1 ? "At least one clause is mandatory" : "Delete clause"}
                     >
                       Delete
                     </button>

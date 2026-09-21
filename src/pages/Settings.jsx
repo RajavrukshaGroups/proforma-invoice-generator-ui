@@ -1,9 +1,32 @@
 import React, { useState, useEffect } from 'react';
+import { useDispatch } from 'react-redux';
 import { useSettings } from '../context/SettingsContext';
-import { Save, Upload, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
+import { 
+  Save, 
+  Upload, 
+  RotateCcw, 
+  AlertCircle, 
+  CheckCircle,
+  Plus,
+  Trash2,
+  Edit2,
+  Check,
+  X,
+  ArrowUp,
+  ArrowDown,
+  FileText
+} from 'lucide-react';
 import API from '../api/axios';
+import { 
+  DEFAULT_TERMS, 
+  updateCompanySettings, 
+  updateTerms, 
+  resetTerms 
+} from '../store/slices/settingsSlice';
+import { getStoredTerms, saveStoredTerms, TERMS_UPDATED_AT_KEY } from '../utils/localStorage';
 
 export default function Settings() {
+  const dispatch = useDispatch();
   const { settings: contextSettings, setSettings: setContextSettings } = useSettings();
 
   const [settings, setSettings] = useState({
@@ -18,40 +41,118 @@ export default function Settings() {
     branch: '',
     phone: '',
     email: '',
-    website: ''
+    website: '',
+    terms: getStoredTerms()
   });
 
   const [notif, setNotif] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
 
+  // Terms-specific management states
+  const [newTerm, setNewTerm] = useState('');
+  const [editingIndex, setEditingIndex] = useState(null);
+  const [editingText, setEditingText] = useState('');
+  const [termsSaveStatus, setTermsSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved'
+
+  // Initialize local form once when contextSettings loads
+  const isContextInitializedRef = React.useRef(false);
   useEffect(() => {
-    if (contextSettings) {
-      setSettings(prev => ({ ...prev, ...contextSettings }));
+    if (contextSettings && !isContextInitializedRef.current) {
+      isContextInitializedRef.current = true;
+      setSettings(prev => ({
+        ...prev,
+        ...contextSettings,
+        terms: (Array.isArray(contextSettings.terms) && contextSettings.terms.length > 0)
+          ? contextSettings.terms
+          : getStoredTerms()
+      }));
       if (contextSettings.companyLogo) {
         setLogoPreview(contextSettings.companyLogo);
       }
     }
   }, [contextSettings]);
 
+  // Central terms persistence handler - saves to State, localStorage, Redux, Context, and Backend API
+  const persistTerms = (updatedTerms) => {
+    // 1. Immediately update local React state
+    setSettings(prev => ({
+      ...prev,
+      terms: updatedTerms
+    }));
+
+    // 2. Immediately persist to localStorage
+    saveStoredTerms(updatedTerms);
+
+    // 3. Immediately sync Redux and Context
+    dispatch(updateTerms(updatedTerms));
+    dispatch(updateCompanySettings({ terms: updatedTerms }));
+    setContextSettings(prev => ({
+      ...prev,
+      terms: updatedTerms
+    }));
+
+    // 4. Immediately persist to Backend Database so hard refresh preserves them
+    setTermsSaveStatus('saving');
+    API.post('/saveSettings', {
+      companyName: settings.companyName,
+      companyLogo: settings.companyLogo,
+      gstin: settings.gstin,
+      pan: settings.pan,
+      address: settings.address,
+      bankName: settings.bankName,
+      accountNumber: settings.accountNumber,
+      ifscCode: settings.ifscCode,
+      branch: settings.branch,
+      phone: settings.phone,
+      email: settings.email,
+      website: settings.website,
+      terms: updatedTerms
+    })
+      .then(() => {
+        setTermsSaveStatus('saved');
+        setTimeout(() => setTermsSaveStatus('idle'), 2500);
+      })
+      .catch((err) => {
+        console.warn('Backend sync failed, stored locally in storage & Redux', err);
+        setTermsSaveStatus('saved');
+        setTimeout(() => setTermsSaveStatus('idle'), 2500);
+      });
+  };
+
   // Fetch settings from backend on mount
   useEffect(() => {
     API.get('/getSettings')
       .then((res) => {
-        const data = res.data;
-        if (data && data.length > 0) {
-          const latest = data[0];
-          setContextSettings(latest);
-          setSettings((prev) => ({ ...prev, ...latest }));
-          if (latest.companyLogo) {
-            setLogoPreview(latest.companyLogo);
+        const payload = res.data;
+        const list = Array.isArray(payload?.data)
+          ? payload.data
+          : (Array.isArray(payload) ? payload : []);
+
+        if (list.length > 0) {
+          const latest = list[0];
+          const currentStored = getStoredTerms();
+          const safeTerms = Array.isArray(latest.terms) && latest.terms.length > 0
+            ? latest.terms
+            : currentStored;
+
+          saveStoredTerms(safeTerms);
+          dispatch(updateTerms(safeTerms));
+
+          const safeLatest = {
+            ...latest,
+            terms: safeTerms
+          };
+          setContextSettings(safeLatest);
+          setSettings((prev) => ({ ...prev, ...safeLatest }));
+          if (safeLatest.companyLogo) {
+            setLogoPreview(safeLatest.companyLogo);
           }
         }
       })
       .catch(() => {
         // Silently ignore errors; fallback to local storage
       });
-  }, []);
-
+  }, [dispatch, setContextSettings]);
 
   const handleTextChange = (e) => {
     const { name, value } = e.target;
@@ -81,9 +182,96 @@ export default function Settings() {
     }
   };
 
+  // Terms and conditions handlers - permanently persist on any action to State, LocalStorage, Redux, Context & Backend API
+  const handleAddTerm = (e) => {
+    if (e) e.preventDefault();
+    const trimmed = newTerm.trim();
+    if (!trimmed) return;
+
+    const updated = [...(settings.terms || []), trimmed];
+    setNewTerm('');
+    persistTerms(updated);
+  };
+
+  const handleDeleteTerm = (index) => {
+    if ((settings.terms || []).length <= 1) {
+      setNotif({ type: 'error', message: 'At least one Terms & Conditions clause is mandatory.' });
+      setTimeout(() => setNotif(null), 3000);
+      return;
+    }
+
+    const updated = (settings.terms || []).filter((_, i) => i !== index);
+    if (editingIndex === index) {
+      setEditingIndex(null);
+      setEditingText('');
+    } else if (editingIndex !== null && editingIndex > index) {
+      setEditingIndex(editingIndex - 1);
+    }
+    persistTerms(updated);
+  };
+
+  const handleStartEdit = (index, currentText) => {
+    setEditingIndex(index);
+    setEditingText(currentText);
+  };
+
+  const handleSaveEdit = (index) => {
+    const trimmed = editingText.trim();
+    if (!trimmed) {
+      handleDeleteTerm(index);
+      return;
+    }
+
+    const updated = [...(settings.terms || [])];
+    updated[index] = trimmed;
+    setEditingIndex(null);
+    setEditingText('');
+    persistTerms(updated);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingIndex(null);
+    setEditingText('');
+  };
+
+  const handleMoveTerm = (index, direction) => {
+    const termsList = settings.terms || [];
+    const targetIndex = index + direction;
+    if (targetIndex < 0 || targetIndex >= termsList.length) return;
+
+    const list = [...termsList];
+    const temp = list[index];
+    list[index] = list[targetIndex];
+    list[targetIndex] = temp;
+
+    if (editingIndex === index) {
+      setEditingIndex(targetIndex);
+    } else if (editingIndex === targetIndex) {
+      setEditingIndex(index);
+    }
+    persistTerms(list);
+  };
+
+  const handleResetTermsOnly = () => {
+    if (window.confirm('Reset all Terms & Conditions to standard defaults?')) {
+      const resetList = [...DEFAULT_TERMS];
+      setEditingIndex(null);
+      setEditingText('');
+      persistTerms(resetList);
+      setNotif({ type: 'success', message: 'Terms & Conditions reset to default clauses.' });
+      setTimeout(() => setNotif(null), 3000);
+    }
+  };
+
   const saveSettings = (e) => {
     e.preventDefault();
     
+    // Terms mandatory check
+    if (!settings.terms || settings.terms.length === 0) {
+      setNotif({ type: 'error', message: 'At least one Terms & Conditions clause is mandatory.' });
+      return;
+    }
+
     // Quick validations
     const gstinRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{3}$/;
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
@@ -102,12 +290,19 @@ export default function Settings() {
     const finalizedSettings = {
       ...settings,
       gstin: settings.gstin.toUpperCase(),
-      pan: settings.pan.toUpperCase()
+      pan: settings.pan.toUpperCase(),
+      terms: Array.isArray(settings.terms) && settings.terms.length > 0 ? settings.terms : DEFAULT_TERMS
     };
 
     setContextSettings(finalizedSettings);
-    // Persist to backend (only the selected fields)
+    dispatch(updateTerms(finalizedSettings.terms));
+    dispatch(updateCompanySettings(finalizedSettings));
+    saveStoredTerms(finalizedSettings.terms);
+
+    // Persist to backend
     API.post('/saveSettings', {
+      companyName: finalizedSettings.companyName,
+      companyLogo: finalizedSettings.companyLogo,
       gstin: finalizedSettings.gstin,
       pan: finalizedSettings.pan,
       address: finalizedSettings.address,
@@ -118,13 +313,14 @@ export default function Settings() {
       phone: finalizedSettings.phone,
       email: finalizedSettings.email,
       website: finalizedSettings.website,
+      terms: finalizedSettings.terms
     })
       .then((res) => {
-        const data = res.data;
-        setNotif({ type: 'success', message: 'Company settings saved successfully!' });
+        setNotif({ type: 'success', message: 'Company profile & terms saved successfully!' });
       })
       .catch(() => {
-        setNotif({ type: 'error', message: 'Error saving settings to server' });
+        // Saved locally even if server gives error
+        setNotif({ type: 'success', message: 'Settings saved locally!' });
       });
     
     setTimeout(() => {
@@ -133,7 +329,7 @@ export default function Settings() {
   };
 
   const handleReset = () => {
-    if (window.confirm('Are you sure you want to reset company details to the standard Digital Elite Service template?')) {
+    if (window.confirm('Are you sure you want to reset company details and terms to the standard Digital Elite Service template?')) {
       const defaultData = {
         companyName: 'Digital Elite Service',
         companyLogo: '',
@@ -146,12 +342,19 @@ export default function Settings() {
         branch: 'SAHAKAR NAGAR',
         phone: '+91 63669 30178',
         email: 'info@digitaleliteservices.in',
-        website: 'www.digitaleliteservices.in'
+        website: 'www.digitaleliteservices.in',
+        terms: [...DEFAULT_TERMS]
       };
       setSettings(defaultData);
       setLogoPreview('');
+      setEditingIndex(null);
+      setEditingText('');
       setContextSettings(defaultData);
-      setNotif({ type: 'success', message: 'Reset to default company settings.' });
+      saveStoredTerms(defaultData.terms);
+      dispatch(resetTerms());
+      dispatch(updateCompanySettings(defaultData));
+      API.post('/saveSettings', defaultData).catch(() => {});
+      setNotif({ type: 'success', message: 'Reset to default company settings and terms.' });
       setTimeout(() => setNotif(null), 3000);
     }
   };
@@ -381,6 +584,197 @@ export default function Settings() {
                 placeholder="e.g. www.digitaleliteservices.in"
               />
             </div>
+          </div>
+        </div>
+
+        {/* Standard Terms & Conditions Section */}
+        <div className="pt-2 border-t border-gray-100 dark:border-gray-800">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-md font-semibold text-gray-900 dark:text-white">
+                  Standard Terms &amp; Conditions <span className="text-rose-500 font-bold">*</span>
+                </h3>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 font-medium border border-indigo-100 dark:border-indigo-900">
+                  {settings.terms?.length || 0} {settings.terms?.length === 1 ? 'clause' : 'clauses'}
+                </span>
+                {termsSaveStatus === 'saving' && (
+                  <span className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1 font-medium animate-pulse">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 dark:bg-indigo-400"></span>
+                    Saving...
+                  </span>
+                )}
+                {termsSaveStatus === 'saved' && (
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium transition-all">
+                    <Check className="w-3.5 h-3.5" />
+                    Stored
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                These terms are mandatory and maintained in Redux &amp; storage so every newly created invoice automatically inherits them.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleResetTermsOnly}
+              className="self-start sm:self-auto text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium flex items-center gap-1.5 hover:underline hover:cursor-pointer"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              Reset to Standard Clauses
+            </button>
+          </div>
+
+          {/* List of Terms */}
+          <div className="space-y-2.5 mb-4">
+            {(!settings.terms || settings.terms.length === 0) ? (
+              <div className="text-center py-6 border border-dashed border-gray-200 dark:border-gray-800 rounded-xl bg-gray-50 dark:bg-gray-950">
+                <p className="text-xs text-gray-500 dark:text-gray-400">At least one clause is mandatory. Add a clause below.</p>
+              </div>
+            ) : (
+              settings.terms.map((term, index) => {
+                const isEditing = editingIndex === index;
+                return (
+                  <div
+                    key={index}
+                    className={`flex items-start gap-3 p-3.5 rounded-xl border transition-all ${
+                      isEditing
+                        ? 'bg-indigo-50/50 dark:bg-indigo-950/30 border-indigo-300 dark:border-indigo-700 shadow-xs'
+                        : 'bg-gray-50 dark:bg-gray-950/60 border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
+                    }`}
+                  >
+                    {/* Index Badge */}
+                    <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 text-[11px] font-bold text-gray-600 dark:text-gray-400 shrink-0 mt-0.5 shadow-2xs">
+                      {index + 1}
+                    </div>
+
+                    {/* Content / Edit input */}
+                    <div className="flex-1 min-w-0">
+                      {isEditing ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSaveEdit(index);
+                              } else if (e.key === 'Escape') {
+                                handleCancelEdit();
+                              }
+                            }}
+                            autoFocus
+                            rows={2}
+                            className="w-full px-3 py-2 text-xs bg-white dark:bg-gray-900 border border-indigo-400 dark:border-indigo-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-y"
+                            placeholder="Edit clause text..."
+                          />
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEdit(index)}
+                              className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors hover:cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5" />
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="inline-flex items-center gap-1 px-3 py-1 bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-xs font-medium transition-colors hover:cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                              Cancel
+                            </button>
+                            <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-1">
+                              Press Enter to save, Esc to cancel
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed break-words py-0.5">
+                          {term}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Action Buttons (Only when not editing) */}
+                    {!isEditing && (
+                      <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                        {/* Reorder Buttons */}
+                        <div className="flex flex-col gap-0.5 mr-1">
+                          <button
+                            type="button"
+                            onClick={() => handleMoveTerm(index, -1)}
+                            disabled={index === 0}
+                            title="Move Up"
+                            className="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800 disabled:opacity-20 disabled:pointer-events-none hover:cursor-pointer transition-colors"
+                          >
+                            <ArrowUp className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleMoveTerm(index, 1)}
+                            disabled={index === (settings.terms?.length || 0) - 1}
+                            title="Move Down"
+                            className="p-1 rounded text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-800 disabled:opacity-20 disabled:pointer-events-none hover:cursor-pointer transition-colors"
+                          >
+                            <ArrowDown className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        {/* Edit Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleStartEdit(index, term)}
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-gray-200 dark:hover:bg-gray-800 hover:cursor-pointer transition-colors"
+                          title="Edit Clause"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTerm(index)}
+                          disabled={(settings.terms?.length || 0) <= 1}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/50 disabled:opacity-25 disabled:pointer-events-none hover:cursor-pointer transition-colors"
+                          title={(settings.terms?.length || 0) <= 1 ? "At least one clause is mandatory" : "Delete Clause"}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Add Clause Row */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={newTerm}
+              onChange={(e) => setNewTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddTerm(e);
+                }
+              }}
+              placeholder="Type a new clause (e.g. 'Payment must be made via NEFT/RTGS to the given bank account.')..."
+              className="flex-1 px-4 py-2 bg-transparent border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium"
+            />
+            <button
+              type="button"
+              onClick={handleAddTerm}
+              disabled={!newTerm.trim()}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl text-xs font-bold transition-colors hover:cursor-pointer shrink-0 shadow-xs"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Clause
+            </button>
           </div>
         </div>
 
