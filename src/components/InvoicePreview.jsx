@@ -1341,11 +1341,11 @@ export default function InvoicePreview({
                       }}
                     >
                       <div>
-                        1st Floor, Sathya Heritage, #2574, 8th Cross, 13th Main,
+                         #2574, Sathya Heritage, 1st Floor, 8th Cross, 13th Main Road,
                       </div>
 
                       <div>
-                        E-Block, Sahakarnagar, Bengaluru, Karnataka 560092
+                         E-Block, Sahakarnagar, Bangalore, Karnataka 560092.
                       </div>
                     </div>
                   </div>
