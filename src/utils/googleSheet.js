@@ -12,18 +12,34 @@ const sheets = google.sheets({
   auth,
 });
 
+export const formatServiceItems = (items) => {
+  if (!Array.isArray(items) || items.length === 0) return "";
+  return items
+    .map((item) => {
+      const desc = (item.description || "").trim();
+      if (!desc) return null;
+      const amt = Number(item.amount);
+      if (!isNaN(amt) && amt > 0) {
+        return `${desc} (₹${amt.toLocaleString("en-IN")})`;
+      }
+      return desc;
+    })
+    .filter(Boolean)
+    .join(", ");
+};
+
 export const addInvoiceToSheet = async (invoice) => {
   const row = [
     invoice.invoiceNumber,
     invoice.customer?.customerName || "",
     invoice.customer?.address || "",
-    invoice.customer?.gstin || "",
-    invoice.customer?.pan || "",
     invoice.subtotal || 0,
     invoice.cgst || 0,
     invoice.sgst || 0,
     invoice.grandTotal || 0,
     invoice.invoiceDate || "",
+    invoice.dueDate || "",
+    formatServiceItems(invoice.items),
   ];
 
   await sheets.spreadsheets.values.append({

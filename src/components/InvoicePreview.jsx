@@ -65,10 +65,12 @@ export default function InvoicePreview({
   const navigate = useNavigate();
 
   const [invoice, setInvoice] = useState(propInvoice);
+  const [loading, setLoading] = useState(!propInvoice);
   const [downloading, setDownloading] = useState(false);
   const [zoomScale, setZoomScale] = useState(1);
 
   const containerRef = useRef(null);
+  const hasAutoDownloadedRef = useRef(false);
 
   const idFromQuery = searchParams.get("id");
 
@@ -137,14 +139,17 @@ export default function InvoicePreview({
       try {
         if (propInvoice) {
           setInvoice(propInvoice);
+          setLoading(false);
           return;
         }
 
         if (!idFromQuery) {
           setInvoice(null);
+          setLoading(false);
           return;
         }
 
+        setLoading(true);
         const res = await API.get(`/getPI/${idFromQuery}`);
 
         if (res.data?.success) {
@@ -155,11 +160,53 @@ export default function InvoicePreview({
       } catch (error) {
         console.error("Error fetching invoice:", error);
         setInvoice(null);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchInvoice();
   }, [propInvoice, idFromQuery]);
+
+  const printableAreaId = `printable-proforma-invoice-${
+    invoice?.id || invoice?._id || "invoice"
+  }`;
+
+  const getProformaFilename = () => {
+    const customerName = invoice?.customer?.customerName?.trim() || "Customer";
+    const invoiceNumber = invoice?.invoiceNumber?.trim() || "Proforma-Invoice";
+    return `${customerName}-${invoiceNumber}`;
+  };
+
+  const handleDownload = async () => {
+    try {
+      setDownloading(true);
+
+      const safeFilename = getProformaFilename();
+
+      await downloadPDF(printableAreaId, safeFilename);
+    } catch (error) {
+      console.error("Download Error:", error);
+
+      alert(
+        error?.response?.data?.message ||
+          error?.message ||
+          "Failed to generate PDF",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (invoice && searchParams.get("download") === "true" && !hasAutoDownloadedRef.current) {
+      hasAutoDownloadedRef.current = true;
+      const timer = setTimeout(() => {
+        handleDownload();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [invoice, searchParams]);
 
   /* ------------------------------------------------------------------------ */
   /*                                  BACK                                    */
@@ -173,6 +220,17 @@ export default function InvoicePreview({
 
     navigate("/history-view");
   };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center p-12">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-600 border-t-transparent" />
+          <p className="text-sm font-medium text-gray-500">Loading invoice preview...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!invoice) {
     return (
@@ -190,36 +248,6 @@ export default function InvoicePreview({
       </div>
     );
   }
-
-  const printableAreaId = `printable-proforma-invoice-${
-    invoice.id || invoice._id || "invoice"
-  }`;
-
-  /* ------------------------------------------------------------------------ */
-  /*                              DOWNLOAD PDF                                */
-  /* ------------------------------------------------------------------------ */
-
-  const handleDownload = async () => {
-    try {
-      setDownloading(true);
-
-      const customerName = invoice?.customer?.customerName || "Customer";
-
-      const safeFilename = `${customerName} - Proforma Invoice`;
-
-      await downloadPDF(printableAreaId, safeFilename);
-    } catch (error) {
-      console.error("Download Error:", error);
-
-      alert(
-        error?.response?.data?.message ||
-          error?.message ||
-          "Failed to generate PDF",
-      );
-    } finally {
-      setDownloading(false);
-    }
-  };
 
   const company = invoice.company || {};
   const customer = invoice.customer || {};
@@ -249,7 +277,7 @@ export default function InvoicePreview({
             onClick={() =>
               triggerPrint(
                 printableAreaId,
-                `${customer.customerName || "Customer"} - Proforma Invoice`,
+                getProformaFilename(),
               )
             }
             className="flex items-center gap-2 rounded-xl border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-50"

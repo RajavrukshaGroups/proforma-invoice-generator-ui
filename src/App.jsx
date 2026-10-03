@@ -49,11 +49,13 @@ import ForgotPassword from "./pages/ForgotPassword";
 
 import ProtectedRoute from "./components/ProtectedRoute";
 import ResetPassword from "./pages/ResetPassword"
+import ErrorBoundary from "./components/ErrorBoundary";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
 
         {/* Auth Routes */}
         <Route
@@ -128,6 +130,7 @@ function App() {
 
       </Routes>
     </BrowserRouter>
+  </ErrorBoundary>
   );
 }
 

@@ -28,6 +28,9 @@ const invoiceSchema = z.object({
   gstMode: z.enum(['exclusive', 'inclusive']),
   paymentStatus: z.enum(['Pending', 'Partial', 'Paid']).default('Pending'),
   paidPercentage: z.coerce.number().min(0).max(100).default(0),
+  paidAmount: z.coerce.number().min(0).optional().default(0),
+  paymentMode: z.string().optional().default(''),
+  transactionId: z.string().optional().default(''),
   items: z.array(z.object({
     description: z.string().min(1, { message: 'Description is required' }),
     timeFrame: z.coerce.number().gt(0, { message: 'Timeframe must be greater than 0' }),
@@ -64,6 +67,9 @@ export default function CreateInvoice() {
   const [draftRestored, setDraftRestored] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Installments state for installment-wise payments
+  const [installments, setInstallments] = useState([]);
+
   useEffect(() => {
     if (!isEditMode && defaultTerms && defaultTerms.length > 0) {
       setTerms(defaultTerms);
@@ -96,22 +102,45 @@ export default function CreateInvoice() {
       .catch(() => {});
   }, [isEditMode, dispatch]);
 
-  // Default dates: Today and Today + 30 days
+  // Default dates: Today and Today + 5 days
+  const formatYMD = (d) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const getTodayStr = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
+    return formatYMD(new Date());
+  };
+
+  const getDueDateFromInvoiceDate = (invDateStr) => {
+    if (!invDateStr) return '';
+    const parts = invDateStr.split('-');
+    if (parts.length === 3) {
+      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      d.setDate(d.getDate() + 5);
+      return formatYMD(d);
+    }
+    const d = new Date(invDateStr);
+    if (!isNaN(d.getTime())) {
+      d.setDate(d.getDate() + 5);
+      return formatYMD(d);
+    }
+    return '';
   };
 
   const getDueDateDefault = () => {
-    const defaultDate = new Date();
-    defaultDate.setDate(defaultDate.getDate() + 30);
-    return defaultDate.toISOString().split('T')[0];
+    return getDueDateFromInvoiceDate(getTodayStr());
   };
 
   // Determine initial values
   const defaultFormValues = {
     paymentStatus: 'Pending',
     paidPercentage: 0,
+    paidAmount: 0,
+    paymentMode: '',
+    transactionId: '',
     customerName: clientData?.customerName || '',
     address: clientData?.address || '',
     city: clientData?.city || '',
@@ -156,18 +185,46 @@ export default function CreateInvoice() {
       dispatch(updateCompanySettings(inv.company));
       setTerms(inv.terms);
 
+      const existingInstallments = Array.isArray(inv.installments) && inv.installments.length > 0
+        ? inv.installments
+        : ((inv.paidAmount != null && Number(inv.paidAmount) > 0) || inv.paymentMode || inv.paymentStatus === 'Paid' || (inv.paidPercentage != null && Number(inv.paidPercentage) > 0)
+            ? [{
+                amount: inv.paidAmount != null && inv.paidAmount !== ''
+                  ? Number(inv.paidAmount) 
+                  : (inv.paymentStatus === 'Paid' 
+                      ? Number(inv.grandTotal) || 0 
+                      : ((Number(inv.grandTotal) || 0) * (Number(inv.paidPercentage) || 0)) / 100),
+                paymentMode: inv.paymentMode || 'Cash',
+                transactionId: inv.transactionId || '',
+                date: inv.invoiceDate || getTodayStr()
+              }]
+            : []);
+      setInstallments(existingInstallments);
+
+      const resolvedPaidAmount = inv.paidAmount != null && inv.paidAmount !== ''
+        ? Number(inv.paidAmount)
+        : (inv.paymentStatus === 'Paid'
+            ? Number(inv.grandTotal || 0)
+            : inv.paymentStatus === 'Partial'
+            ? ((Number(inv.grandTotal) || 0) * (Number(inv.paidPercentage) || 0)) / 100
+            : 0);
+
+      prevWatchedDateRef.current = inv.invoiceDate;
       reset({
-        customerName: inv.customer.customerName,
-        address: inv.customer.address,
-        city: inv.customer.city,
-        state: inv.customer.state,
-        pincode: inv.customer.pincode,
-        gstin: inv.customer.gstin || '',
+        customerName: inv.customer?.customerName || '',
+        address: inv.customer?.address || '',
+        city: inv.customer?.city || '',
+        state: inv.customer?.state || '',
+        pincode: inv.customer?.pincode || '',
+        gstin: inv.customer?.gstin || '',
         invoiceDate: inv.invoiceDate,
-        dueDate: inv.dueDate,
+        dueDate: inv.dueDate || getDueDateFromInvoiceDate(inv.invoiceDate),
         gstMode: inv.gstMode,
         paymentStatus: inv.paymentStatus || 'Pending',
-        paidPercentage: inv.paidPercentage ?? 0,
+        paidPercentage: inv.paidPercentage ?? (inv.paymentStatus === 'Paid' ? 100 : 0),
+        paidAmount: resolvedPaidAmount,
+        paymentMode: inv.paymentMode || '',
+        transactionId: inv.transactionId || '',
         items: inv.items
       });
 
@@ -179,14 +236,22 @@ export default function CreateInvoice() {
   fetchInvoice();
 }, [idParam, dispatch, reset]);
 
-  // Handle invoice dynamic changes to adjust auto-numbered label instantly
+  // Handle invoice dynamic changes to adjust auto-numbered label instantly and auto-update due date (invoice date + 5 days)
   const watchedDate = watch('invoiceDate');
+  const prevWatchedDateRef = useRef(getTodayStr());
+
   useEffect(() => {
-    if (!isEditMode && watchedDate) {
-      const nextNo = selectNextInvoiceNumber(store.getState(), watchedDate);
-      setInvoiceNumber(nextNo);
+    if (watchedDate) {
+      if (!isEditMode) {
+        const nextNo = selectNextInvoiceNumber(store.getState(), watchedDate);
+        setInvoiceNumber(nextNo);
+      }
+      if (prevWatchedDateRef.current !== watchedDate) {
+        prevWatchedDateRef.current = watchedDate;
+        setValue('dueDate', getDueDateFromInvoiceDate(watchedDate));
+      }
     }
-  }, [watchedDate, isEditMode, store]);
+  }, [watchedDate, isEditMode, store, setValue]);
 
   // Sync highest sequential counter from existing database invoices
   useEffect(() => {
@@ -235,17 +300,72 @@ export default function CreateInvoice() {
   const watchedItems = watch('items');
   const watchedGstMode = watch('gstMode');
   const watchedPaymentStatus = watch('paymentStatus');
+  const watchedPaymentMode = watch('paymentMode');
+  const watchedPaidAmount = watch('paidAmount');
+
+  // Triggering instant GST values summary
+  const totals = calculateGST(watchedItems || [], watchedGstMode || 'exclusive');
+
+  // Installment helper handlers
+  const handleAddInstallment = () => {
+    setInstallments(prev => [
+      ...prev,
+      {
+        amount: '',
+        paymentMode: 'UPI',
+        transactionId: '',
+        date: watchedDate || getTodayStr()
+      }
+    ]);
+  };
+
+  const handleRemoveInstallment = (idx) => {
+    setInstallments(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleInstallmentChange = (idx, field, value) => {
+    setInstallments(prev => prev.map((inst, i) => i === idx ? { ...inst, [field]: value } : inst));
+  };
+
+  const totalReceivedFromInstallments = installments.reduce((sum, inst) => sum + (Number(inst.amount) || 0), 0);
 
   useEffect(() => {
     if (watchedPaymentStatus === 'Pending') {
       setValue('paidPercentage', 0);
+      setValue('paidAmount', 0);
+      setValue('paymentMode', '');
+      setValue('transactionId', '');
+      setInstallments([]);
     } else if (watchedPaymentStatus === 'Paid') {
       setValue('paidPercentage', 100);
+      setValue('paidAmount', totals.grandTotal);
+    } else if (watchedPaymentStatus === 'Partial') {
+      if (installments.length === 0) {
+        setInstallments([
+          {
+            amount: watchedPaidAmount && Number(watchedPaidAmount) > 0 ? Number(watchedPaidAmount) : '',
+            paymentMode: watchedPaymentMode || 'Cash',
+            transactionId: '',
+            date: watchedDate || getTodayStr()
+          }
+        ]);
+      }
     }
-  }, [watchedPaymentStatus, setValue]);
+  }, [watchedPaymentStatus, totals.grandTotal, setValue]);
 
-  // Triggering instant GST values summary
-  const totals = calculateGST(watchedItems || [], watchedGstMode || 'exclusive');
+  // Keep paidPercentage and paidAmount in sync with installments in Partial mode
+  useEffect(() => {
+    if (watchedPaymentStatus === 'Partial' && installments.length > 0) {
+      setValue('paidAmount', totalReceivedFromInstallments);
+      const pct = totals.grandTotal > 0 ? (totalReceivedFromInstallments / totals.grandTotal) * 100 : 0;
+      setValue('paidPercentage', Math.min(100, Math.max(0, Math.round(pct * 100) / 100)));
+      const last = installments[installments.length - 1];
+      if (last) {
+        setValue('paymentMode', last.paymentMode || 'Cash');
+        setValue('transactionId', last.transactionId || '');
+      }
+    }
+  }, [installments, watchedPaymentStatus, totals.grandTotal, setValue, totalReceivedFromInstallments]);
 
   // Auto-save form draft to LocalStorage every 3 seconds
   const isFirstDraftSave = useRef(true);
@@ -344,30 +464,66 @@ const onSubmit = async (data) => {
     return;
   }
 
-  const payload = {
-    invoiceNumber,
-    customer: {
-      customerName: data.customerName,
-      address: data.address,
-      city: data.city,
-      state: data.state,
-      pincode: data.pincode,
-      gstin: data.gstin ? data.gstin.toUpperCase().trim() : undefined,
-    },
-    invoiceDate: data.invoiceDate,
-    dueDate: data.dueDate,
-    gstMode: data.gstMode,
-    paymentStatus: data.paymentStatus,
-    paidPercentage: data.paidPercentage,
-    items: totals.subtotal > 0 ? data.items : [],
-    subtotal: totals.subtotal,
-    cgst: totals.cgst,
-    sgst: totals.sgst,
-    grandTotal: totals.grandTotal,
-    amountInWords: totals.amountInWords,
-    terms,
-    company: companySnapshot
-  };
+    const resolvedInstallments = data.paymentStatus === 'Pending' 
+      ? [] 
+      : data.paymentStatus === 'Partial'
+      ? installments.map((inst, i) => ({
+          installmentNumber: i + 1,
+          amount: Number(inst.amount) || 0,
+          paymentMode: inst.paymentMode || 'Cash',
+          transactionId: inst.transactionId || '',
+          date: inst.date || data.invoiceDate || getTodayStr()
+        }))
+      : (installments.length > 0 ? installments : [{
+          installmentNumber: 1,
+          amount: totals.grandTotal,
+          paymentMode: data.paymentMode || 'Cash',
+          transactionId: data.transactionId || '',
+          date: data.invoiceDate || getTodayStr()
+        }]);
+
+    const resolvedPaidAmount = data.paymentStatus === 'Paid'
+      ? totals.grandTotal
+      : data.paymentStatus === 'Pending'
+      ? 0
+      : (installments.length > 0 
+          ? totalReceivedFromInstallments 
+          : (Number(data.paidAmount) || 0));
+
+    const resolvedPaidPercentage = data.paymentStatus === 'Paid'
+      ? 100
+      : data.paymentStatus === 'Pending'
+      ? 0
+      : (totals.grandTotal > 0 ? Math.min(100, Math.max(0, (resolvedPaidAmount / totals.grandTotal) * 100)) : 0);
+
+    const payload = {
+      invoiceNumber,
+      customer: {
+        customerName: data.customerName,
+        address: data.address,
+        city: data.city,
+        state: data.state,
+        pincode: data.pincode,
+        gstin: data.gstin ? data.gstin.toUpperCase().trim() : undefined,
+      },
+      invoiceDate: data.invoiceDate,
+      dueDate: data.dueDate,
+      gstMode: data.gstMode,
+      paymentStatus: data.paymentStatus,
+      paidPercentage: Math.round(resolvedPaidPercentage * 100) / 100,
+      paidAmount: resolvedPaidAmount,
+      paymentMode: data.paymentStatus === 'Pending' ? '' : (data.paymentMode || (installments[0]?.paymentMode || '')),
+      transactionId: data.paymentStatus === 'Pending' ? '' : (data.transactionId || (installments[0]?.transactionId || '')),
+      installments: resolvedInstallments,
+      items: totals.subtotal > 0 ? data.items : [],
+      subtotal: totals.subtotal,
+      cgst: totals.cgst,
+      sgst: totals.sgst,
+      grandTotal: totals.grandTotal,
+      amountInWords: totals.amountInWords,
+      terms,
+      company: companySnapshot
+    };
 
   try {
 
@@ -606,10 +762,11 @@ const onSubmit = async (data) => {
                       </select>
                       <input
                         type="number"
+                        step="any"
+                        min="0"
                         {...register(`items.${index}.timeFrame`)}
                         className="w-full px-3 py-1.5 bg-transparent border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium"
                         placeholder="1"
-                        min={1}
                       />
                       {errors.items?.[index]?.timeFrame && (
                         <p className="text-[10px] text-rose-500 mt-1 font-medium">{errors.items[index]?.timeFrame?.message}</p>
@@ -620,10 +777,11 @@ const onSubmit = async (data) => {
                       <label className="block text-[10px] font-extrabold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Amount (₹) *</label>
                       <input
                         type="number"
+                        step="any"
+                        min="0"
                         {...register(`items.${index}.amount`)}
                         className="w-full px-3 py-1.5 bg-transparent border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-medium"
-                        placeholder="0"
-                        min={1}
+                        placeholder="0.00"
                       />
                       {errors.items?.[index]?.amount && (
                         <p className="text-[10px] text-rose-500 mt-1 font-medium">{errors.items[index]?.amount?.message}</p>
@@ -653,7 +811,7 @@ const onSubmit = async (data) => {
             <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-6 shadow-sm">
               <h2 className="text-sm font-bold text-gray-900 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-3 mb-4 uppercase tracking-wider flex items-center justify-between">
                 <span>Terms &amp; Conditions <span className="text-rose-500 font-bold">*</span></span>
-                <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 normal-case tracking-normal">Mandatory &amp; Maintained in Redux</span>
+                {/* <span className="text-[11px] font-medium text-indigo-600 dark:text-indigo-400 normal-case tracking-normal">Mandatory &amp; Maintained in Redux</span> */}
               </h2>
               
               <div className="space-y-3 mb-4">
@@ -770,34 +928,211 @@ const onSubmit = async (data) => {
                 >
                   Amount Inc. GST
                 </button>
-                <div className="flex flex-col gap-3 py-3">
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-800 dark:text-gray-400 uppercase tracking-wider mb-1">Payment Status</label>
-                    <select
-                      {...register('paymentStatus')}
-                      className="w-full px-3 py-2 bg-transparent border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="Partial">Partial</option>
-                      <option value="Paid">Paid</option>
-                    </select>
-                  </div>
-                  {watchedPaymentStatus === 'Partial' && (
-                    <div>
-                      <label className="block text-[11px] font-bold text-gray-800 dark:text-gray-400 uppercase tracking-wider mb-1">Paid Percentage (%)</label>
-                      <input
-                        type="number"
-                        {...register('paidPercentage')}
-                        min={0}
-                        max={100}
-                        className="w-full px-3 py-2 bg-transparent border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
-                        placeholder="e.g. 45"
-                      />
-                    </div>
-                  )}
-                </div>
-                <hr className="my-3 border-gray-200 dark:border-gray-800" />
               </div>
+
+              {/* Payment Status & Details (Full Card Width) */}
+              <div className="flex flex-col gap-3 pt-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-800 dark:text-gray-400 uppercase tracking-wider mb-1">
+                    Payment Status
+                  </label>
+                  <select
+                    {...register('paymentStatus')}
+                    className="w-full px-3 py-2 bg-transparent border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Partial">Partial</option>
+                    <option value="Paid">Paid</option>
+                  </select>
+                </div>
+
+                {/* Partial Payment: Installment-wise Payments */}
+                {watchedPaymentStatus === 'Partial' && (
+                  <div className="space-y-3 p-3.5 bg-amber-50/70 dark:bg-amber-950/20 rounded-2xl border border-amber-200 dark:border-amber-900/40">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-900 dark:text-gray-100 uppercase tracking-wider flex items-center gap-1.5">
+                        <span>Installments ({installments.length})</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleAddInstallment}
+                        className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 shadow-xs cursor-pointer"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        Add Installment
+                      </button>
+                    </div>
+
+                    {/* List of installment inputs */}
+                    <div className="space-y-3">
+                      {installments.map((inst, idx) => (
+                        <div 
+                          key={idx} 
+                          className="p-3 bg-white dark:bg-gray-900 rounded-xl border border-amber-200/80 dark:border-amber-900/40 space-y-2 shadow-xs"
+                        >
+                          <div className="flex items-center justify-between border-b border-gray-100 dark:border-gray-800 pb-1">
+                            <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                              Installment #{idx + 1}
+                            </span>
+                            {installments.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveInstallment(idx)}
+                                className="text-gray-400 hover:text-rose-500 p-0.5 rounded transition-colors"
+                                title="Remove installment"
+                              >
+                                <Trash className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-1">
+                                Amount (₹) *
+                              </label>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={inst.amount}
+                                onChange={(e) => handleInstallmentChange(idx, 'amount', e.target.value)}
+                                className="w-full px-2.5 py-1.5 bg-transparent border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs font-mono font-bold"
+                                placeholder="0.00"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-1">
+                                Date
+                              </label>
+                              <input
+                                type="date"
+                                value={inst.date}
+                                onChange={(e) => handleInstallmentChange(idx, 'date', e.target.value)}
+                                className="w-full px-2 py-1.5 bg-transparent border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-1">
+                              Payment Mode *
+                            </label>
+                            <select
+                              value={inst.paymentMode}
+                              onChange={(e) => handleInstallmentChange(idx, 'paymentMode', e.target.value)}
+                              className="w-full px-2.5 py-1.5 bg-transparent border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs font-medium"
+                            >
+                              <option value="Cash">Cash</option>
+                              <option value="UPI">UPI (Transaction ID)</option>
+                              <option value="NEFT">NEFT (Transaction ID)</option>
+                              <option value="Cheque">Cheque (Transaction ID)</option>
+                              <option value="IMPS">IMPS (Transaction ID)</option>
+                              <option value="RTGS">RTGS (Transaction ID)</option>
+                            </select>
+                          </div>
+
+                          {inst.paymentMode !== 'Cash' && (
+                            <div>
+                              <label className="block text-[10px] font-bold text-gray-700 dark:text-gray-400 uppercase tracking-wider mb-1">
+                                {inst.paymentMode === 'Cheque' ? 'Cheque No. / Transaction ID' : `${inst.paymentMode} Transaction ID`}
+                              </label>
+                              <input
+                                type="text"
+                                value={inst.transactionId}
+                                onChange={(e) => handleInstallmentChange(idx, 'transactionId', e.target.value)}
+                                className="w-full px-2.5 py-1.5 bg-transparent border border-gray-300 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-amber-500 text-xs font-mono"
+                                placeholder={
+                                  inst.paymentMode === 'UPI' ? 'Enter UPI Transaction ID' :
+                                  inst.paymentMode === 'NEFT' ? 'Enter NEFT UTR / Transaction ID' :
+                                  inst.paymentMode === 'Cheque' ? 'Enter Cheque Number' :
+                                  inst.paymentMode === 'IMPS' ? 'Enter IMPS Ref / Txn ID' :
+                                  'Enter RTGS UTR'
+                                }
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Financial Summary */}
+                    <div className="pt-2 border-t border-amber-200/80 dark:border-amber-900/40 space-y-1.5 text-xs font-medium">
+                      <div className="flex justify-between items-center text-gray-600 dark:text-gray-400">
+                        <span>Total Invoiced:</span>
+                        <span className="font-mono font-bold text-gray-900 dark:text-white">
+                          ₹{totals.grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-emerald-600 dark:text-emerald-400 font-semibold">
+                        <span>Total Received:</span>
+                        <span className="font-mono font-bold">
+                          ₹{totalReceivedFromInstallments.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between px-3 py-2 bg-white dark:bg-gray-900 rounded-lg border border-amber-200 dark:border-amber-900/40 text-xs">
+                        <span className="text-amber-800 dark:text-amber-300 font-bold">Pending Balance:</span>
+                        <span className="font-mono font-bold text-amber-600 dark:text-amber-400 text-sm">
+                          ₹{Math.max(0, totals.grandTotal - totalReceivedFromInstallments).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Paid Payment Mode (for 100% full paid) */}
+                {watchedPaymentStatus === 'Paid' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-gray-800 dark:text-gray-400 uppercase tracking-wider mb-1">
+                        Payment Mode *
+                      </label>
+                      <select
+                        {...register('paymentMode')}
+                        className="w-full px-3 py-2 bg-transparent border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium"
+                      >
+                        <option value="">Select Payment Mode</option>
+                        <option value="Cash">Cash</option>
+                        <option value="UPI">UPI (Transaction ID)</option>
+                        <option value="NEFT">NEFT (Transaction ID)</option>
+                        <option value="Cheque">Cheque (Transaction ID)</option>
+                        <option value="IMPS">IMPS (Transaction ID)</option>
+                        <option value="RTGS">RTGS (Transaction ID)</option>
+                      </select>
+                    </div>
+
+                    {/* Transaction ID input (for non-cash modes in Paid) */}
+                    {watchedPaymentMode && watchedPaymentMode.toLowerCase() !== 'cash' && (
+                      <div>
+                        <label className="block text-[11px] font-bold text-gray-800 dark:text-gray-400 uppercase tracking-wider mb-1">
+                          {watchedPaymentMode === 'Cheque' ? 'Cheque / Transaction ID' : `${watchedPaymentMode} Transaction ID`}
+                        </label>
+                        <input
+                          type="text"
+                          {...register('transactionId')}
+                          className="w-full px-3 py-2 bg-transparent border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-medium font-mono"
+                          placeholder={
+                            watchedPaymentMode === 'UPI' ? 'Enter UPI Transaction ID' :
+                            watchedPaymentMode === 'NEFT' ? 'Enter NEFT UTR / Transaction ID' :
+                            watchedPaymentMode === 'Cheque' ? 'Enter Cheque Number / Reference' :
+                            watchedPaymentMode === 'IMPS' ? 'Enter IMPS Reference / Transaction ID' :
+                            'Enter RTGS UTR / Transaction ID'
+                          }
+                        />
+                      </div>
+                    )}
+
+                    {/* Cash indicator */}
+                    {watchedPaymentMode && watchedPaymentMode.toLowerCase() === 'cash' && (
+                      <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs text-emerald-700 dark:text-emerald-400 font-medium flex items-center gap-2">
+                        <span>💵 Cash payment recorded (No Transaction ID required)</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <hr className="my-3 border-gray-200 dark:border-gray-800" />
 
               {/* Computation card */}
               <div className="space-y-3 pt-3">
