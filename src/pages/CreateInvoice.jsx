@@ -9,8 +9,9 @@ import { selectCompanySettings, updateCompanySettings, selectTerms, updateTerms,
 import { getStoredTerms, saveStoredTerms, TERMS_UPDATED_AT_KEY } from '../utils/localStorage';
 import { calculateGST } from '../utils/calculations';
 import { store } from '../store/store';
-import { Plus, Trash, Save, FileText, Check, AlertTriangle, RefreshCcw } from 'lucide-react';
+import { Plus, Trash, Save, FileText, Check, AlertTriangle, RefreshCcw, User } from 'lucide-react';
 import API from '../api/axios';
+import { getCreatorInfo, getLoggedInUser, getLoggedInUserId } from '../utils/userHelper';
 
 
 const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[A-Z0-9]{3}$/i;
@@ -496,8 +497,14 @@ const onSubmit = async (data) => {
       ? 0
       : (totals.grandTotal > 0 ? Math.min(100, Math.max(0, (resolvedPaidAmount / totals.grandTotal) * 100)) : 0);
 
+    const currentUserId = getLoggedInUserId();
+    const resolvedCreatedBy = isEditMode
+      ? (editingInvoiceSnap?.createdBy?._id || editingInvoiceSnap?.createdBy || currentUserId)
+      : currentUserId;
+
     const payload = {
       invoiceNumber,
+      ...(resolvedCreatedBy ? { createdBy: resolvedCreatedBy } : {}),
       customer: {
         customerName: data.customerName,
         address: data.address,
@@ -606,6 +613,17 @@ const onSubmit = async (data) => {
               : 'Build a compliant, sequential proforma billing item. Calculations update dynamically with tax schedules.'
             }
           </p>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+              <User className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{isEditMode ? 'Created by:' : 'Author:'}</span>
+              <strong className="text-slate-900 dark:text-white">
+                {isEditMode 
+                  ? getCreatorInfo(editingInvoiceSnap?.createdBy).name 
+                  : (getLoggedInUser()?.name || 'Current User')}
+              </strong>
+            </span>
+          </div>
         </div>
         
         {draftRestored && (

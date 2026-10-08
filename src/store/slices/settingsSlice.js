@@ -1,4 +1,4 @@
-import { createSlice } from '@reduxjs/toolkit';
+import { createSlice, createSelector } from '@reduxjs/toolkit';
 import { getStoredTerms, saveStoredTerms } from '../../utils/localStorage';
 
 export const DEFAULT_TERMS = [
@@ -51,11 +51,16 @@ const settingsSlice = createSlice({
 
 export const { updateCompanySettings, updateTerms, resetTerms } = settingsSlice.actions;
 
-export const selectCompanySettings = (state) => ({
-  ...state.settings.companySettings,
-  terms: state.settings.terms || DEFAULT_TERMS
-});
-export const selectTerms = (state) => state.settings.terms || DEFAULT_TERMS;
+export const selectRawCompanySettings = (state) => state.settings?.companySettings;
+export const selectTerms = (state) => state.settings?.terms || DEFAULT_TERMS;
+
+export const selectCompanySettings = createSelector(
+  [selectRawCompanySettings, selectTerms],
+  (companySettings, terms) => ({
+    ...(companySettings || {}),
+    terms: terms || DEFAULT_TERMS
+  })
+);
 
 export default settingsSlice.reducer;
 

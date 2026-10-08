@@ -3,9 +3,10 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { 
   Search, Eye, Edit2, Trash2, ChevronLeft, ChevronRight, FileText, 
   Receipt, Plus, Check, Clock, AlertCircle, X, ChevronDown, 
-  ChevronUp, CheckCircle2, Copy, Download
+  ChevronUp, CheckCircle2, Copy, Download, User, Filter
 } from 'lucide-react';
 import API from '../api/axios';
+import { getCreatorInfo } from '../utils/userHelper';
 
 const ITEMS_PER_PAGE = 8;
 
@@ -107,6 +108,7 @@ export default function HistoryView() {
   const clientFilter = location.state?.client || null;
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCreator, setSelectedCreator] = useState('ALL');
   const [currentPage, setCurrentPage] = useState(1);
   const [showConfirmId, setShowConfirmId] = useState(null);
 
@@ -140,6 +142,27 @@ export default function HistoryView() {
     loadInvoices();
   }, []);
 
+  // Compute unique creators with invoice counts for filter dropdown
+  const creatorOptions = useMemo(() => {
+    if (!Array.isArray(invoices)) return [];
+    const map = new Map();
+    invoices.forEach((inv) => {
+      if (!inv) return;
+      const creator = getCreatorInfo(inv.createdBy);
+      const name = creator?.name || 'System / Unassigned';
+      if (!map.has(name)) {
+        map.set(name, {
+          name,
+          email: creator?.email || '',
+          initials: creator?.initials || 'U',
+          count: 0,
+        });
+      }
+      map.get(name).count += 1;
+    });
+    return Array.from(map.values()).sort((a, b) => b.count - a.count);
+  }, [invoices]);
+
   const handleNavigate = (view, selectedId) => {
     if (view === 'create') {
       if (selectedId) navigate(`/create?id=${selectedId}`);
@@ -158,26 +181,52 @@ export default function HistoryView() {
     navigate(`/create?id=${id}`);
   };
 
-  // Search logic: checks both Invoice Number and Customer Name
+  // Search & Filter logic: checks Creator, Client Name, Invoice Number, location
   const filteredInvoices = useMemo(() => {
-    const rawSearch = searchTerm.toLowerCase().trim();
+    if (!Array.isArray(invoices)) return [];
+    const rawSearch = (searchTerm || '').toLowerCase().trim();
     return invoices.filter(inv => {
-      const matchesSearch = rawSearch ? (
-        inv.invoiceNumber?.toLowerCase().includes(rawSearch) ||
-        inv.customer?.customerName?.toLowerCase().includes(rawSearch) ||
-        inv.customer?.city?.toLowerCase().includes(rawSearch) ||
-        inv.customer?.state?.toLowerCase().includes(rawSearch)
-      ) : true;
-      const matchesClient = clientFilter ? inv.customer?.customerName === clientFilter.customerName : true;
-      return matchesSearch && matchesClient;
+      if (!inv) return false;
+      const creator = getCreatorInfo(inv.createdBy);
+
+      // 1. Filter by selected creator
+      if (selectedCreator !== 'ALL' && creator?.name !== selectedCreator) {
+        return false;
+      }
+
+      // 2. Filter by client (from location state)
+      if (clientFilter && inv.customer?.customerName !== clientFilter.customerName) {
+        return false;
+      }
+
+      // 3. Search query
+      if (rawSearch) {
+        const creatorName = (creator?.name || '').toLowerCase();
+        const creatorEmail = (creator?.email || '').toLowerCase();
+        const invNum = String(inv.invoiceNumber || '').toLowerCase();
+        const custName = String(inv.customer?.customerName || '').toLowerCase();
+        const city = String(inv.customer?.city || '').toLowerCase();
+        const state = String(inv.customer?.state || '').toLowerCase();
+
+        return (
+          invNum.includes(rawSearch) ||
+          custName.includes(rawSearch) ||
+          city.includes(rawSearch) ||
+          state.includes(rawSearch) ||
+          creatorName.includes(rawSearch) ||
+          creatorEmail.includes(rawSearch)
+        );
+      }
+
+      return true;
     });
-  }, [invoices, searchTerm, clientFilter]);
+  }, [invoices, searchTerm, clientFilter, selectedCreator]);
 
   // Pagination logic
   const totalPages = Math.ceil(filteredInvoices.length / ITEMS_PER_PAGE);
   const paginatedInvoices = useMemo(() => {
     // Return sorted descending (by creation date/ID)
-    const sorted = [...filteredInvoices].sort((a, b) => (b._id || '').localeCompare(a._id || ''));
+    const sorted = [...filteredInvoices].sort((a, b) => String(b?._id || '').localeCompare(String(a?._id || '')));
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     return sorted.slice(startIndex, startIndex + ITEMS_PER_PAGE);
   }, [filteredInvoices, currentPage]);
@@ -268,6 +317,7 @@ export default function HistoryView() {
         customer: inv.customer,
         invoiceDate: inv.invoiceDate,
         dueDate: inv.dueDate,
+        createdBy: inv.createdBy?._id || inv.createdBy,
         gstMode: inv.gstMode,
         paymentStatus: newStatus,
         paidPercentage: newPaidPct,
@@ -330,6 +380,7 @@ export default function HistoryView() {
         customer: inv.customer,
         invoiceDate: inv.invoiceDate,
         dueDate: inv.dueDate,
+        createdBy: inv.createdBy?._id || inv.createdBy,
         gstMode: inv.gstMode,
         paymentStatus: newStatus,
         paidPercentage: newPaidPct,
@@ -385,36 +436,145 @@ export default function HistoryView() {
       </div>
 
       {/* Modern Search/Filter Input Frame */}
-      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 flex flex-col md:flex-row items-stretch md:items-center gap-4 shadow-sm">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-2.5 text-gray-400 dark:text-gray-500 w-5 h-5 pointer-events-none" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setCurrentPage(1); // reset to page 1 on search
-            }}
-            placeholder="Search by client name, invoice number, city or state..."
-            className="w-full pl-10 pr-4 py-2 bg-transparent border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-          />
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          {/* Text Search */}
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-2.5 text-gray-400 dark:text-gray-500 w-5 h-5 pointer-events-none" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1); // reset to page 1 on search
+              }}
+              placeholder="Search by client, invoice number, city, or created by..."
+              className="w-full pl-10 pr-4 py-2.5 bg-transparent border border-gray-300 dark:border-gray-700 rounded-xl text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            />
+          </div>
+
+          {/* Created By Filter Dropdown */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="relative min-w-[210px] w-full sm:w-auto">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-indigo-500">
+                <User className="w-4 h-4" />
+              </div>
+              <select
+                value={selectedCreator}
+                onChange={(e) => {
+                  setSelectedCreator(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-9 py-2.5 bg-slate-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-xl text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer shadow-2xs appearance-none transition-all hover:border-indigo-400 dark:hover:border-indigo-600"
+              >
+                <option value="ALL">All Creators ({invoices.length})</option>
+                {creatorOptions.map((opt) => (
+                  <option key={opt.name} value={opt.name}>
+                    {opt.name} ({opt.count})
+                  </option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-gray-400">
+                <ChevronDown className="w-4 h-4" />
+              </div>
+            </div>
+
+            {selectedCreator !== 'ALL' && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCreator('ALL');
+                  setCurrentPage(1);
+                }}
+                className="px-2.5 py-2.5 text-xs font-semibold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/50 rounded-xl border border-rose-200 dark:border-rose-900 transition-colors flex items-center gap-1 cursor-pointer shrink-0"
+                title="Reset creator filter"
+              >
+                <span>Reset</span>
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+          
+          {/* Helper info text */}
+          <div className="text-xs text-gray-400 self-center hidden lg:block shrink-0 pl-2">
+            Showing <span className="font-bold text-gray-700 dark:text-gray-300">{filteredInvoices.length}</span> results
+          </div>
         </div>
-        
-        {/* Helper info text */}
-        <div className="text-xs text-gray-400 self-center hidden sm:block">
-          Showing <span className="font-bold text-gray-700 dark:text-gray-300">{filteredInvoices.length}</span> results
-        </div>
+
+        {/* Active Filter Pills (shown when filtering by creator, search, or client) */}
+        {(selectedCreator !== 'ALL' || clientFilter || searchTerm) && (
+          <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-gray-150 dark:border-gray-800 text-xs">
+            <span className="text-gray-400 font-medium flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5 text-indigo-500" />
+              Active filters:
+            </span>
+
+            {selectedCreator !== 'ALL' && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 font-medium">
+                <User className="w-3 h-3 text-indigo-500" />
+                Created by: <strong>{selectedCreator}</strong>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCreator('ALL');
+                    setCurrentPage(1);
+                  }}
+                  className="hover:text-indigo-950 dark:hover:text-white cursor-pointer ml-1"
+                  title="Remove creator filter"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
+            {clientFilter && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800/80 font-medium">
+                Client: <strong>{clientFilter.customerName}</strong>
+              </span>
+            )}
+
+            {searchTerm && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800/80 font-medium">
+                Search: <strong>"{searchTerm}"</strong>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setCurrentPage(1);
+                  }}
+                  className="hover:text-amber-950 dark:hover:text-white cursor-pointer ml-1"
+                  title="Clear search"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedCreator('ALL');
+                setSearchTerm('');
+                setCurrentPage(1);
+              }}
+              className="text-xs text-gray-500 hover:text-rose-600 dark:text-gray-400 dark:hover:text-rose-400 underline font-medium cursor-pointer ml-auto"
+            >
+              Clear all filters
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table grid display */}
       <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[950px] text-left font-sans text-xs border-collapse">
+          <table className="w-full min-w-[1050px] text-left font-sans text-xs border-collapse">
             <thead>
               <tr className="border-b border-gray-150 dark:border-gray-800 text-gray-800 dark:text-gray-100 font-bold uppercase tracking-wider text-[11px]">
                 <th className="py-3 px-4 whitespace-nowrap min-w-[170px]">Proforma Number</th>
                 <th className="py-3 px-4 min-w-[170px]">Client Name</th>
                 <th className="py-3 px-4 whitespace-nowrap min-w-[130px]">Billing Date</th>
+                <th className="py-3 px-4 whitespace-nowrap min-w-[150px]">Created By</th>
                 <th className="py-3 px-4 text-right whitespace-nowrap min-w-[110px]">Invoice Sum</th>
                 <th className="py-3 px-4 text-center min-w-[220px] whitespace-nowrap">Payment Status & History</th>
                 <th className="py-3 px-4 text-center whitespace-nowrap min-w-[140px]">Action Checklist</th>
@@ -424,6 +584,7 @@ export default function HistoryView() {
               {paginatedInvoices.length > 0 ? (
                 paginatedInvoices.map((inv) => {
                   const paymentDetails = getInvoicePaymentDetails(inv);
+                  const creatorInfo = getCreatorInfo(inv.createdBy);
                   const status = inv.paymentStatus || 'Pending';
                   const isExpanded = !!expandedInstallments[inv._id];
                   const displayedInstallments = isExpanded ? paymentDetails.installments : paymentDetails.installments.slice(0, 2);
@@ -466,8 +627,39 @@ export default function HistoryView() {
                         </div>
                       </td>
 
+                      {/* Col: Created By */}
+                      <td className="py-4 px-4 align-top whitespace-nowrap min-w-[150px]">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedCreator(creatorInfo.name);
+                            setCurrentPage(1);
+                          }}
+                          title={`Click to filter invoices created by ${creatorInfo.name}`}
+                          className="flex items-center gap-2 text-left group/creator hover:opacity-90 transition-all cursor-pointer p-1 -m-1 rounded-lg hover:bg-indigo-50/70 dark:hover:bg-indigo-950/40"
+                        >
+                          <div className="w-7 h-7 rounded-lg bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200/80 dark:border-indigo-800/80 font-bold flex items-center justify-center text-[10px] shrink-0 select-none shadow-2xs group-hover/creator:ring-2 group-hover/creator:ring-indigo-400 group-hover/creator:scale-105 transition-all">
+                            {creatorInfo.initials}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="font-semibold text-gray-900 dark:text-white block truncate text-xs group-hover/creator:text-indigo-600 dark:group-hover/creator:text-indigo-400 transition-colors" title={creatorInfo.name}>
+                              {creatorInfo.name}
+                            </span>
+                            {creatorInfo.email ? (
+                              <span className="text-[10px] text-gray-400 block truncate max-w-[120px]" title={creatorInfo.email}>
+                                {creatorInfo.email}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-400 block">User Account</span>
+                            )}
+                          </div>
+                        </button>
+                      </td>
+
                       {/* Col: Currency Amount */}
                       <td className="py-4 px-4 text-right align-top whitespace-nowrap min-w-[110px]">
+
                         <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-sm whitespace-nowrap">
                           {formatCurrency(inv.grandTotal)}
                         </span>
@@ -688,11 +880,22 @@ export default function HistoryView() {
                 })
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-gray-400 font-normal">
-                    {searchTerm ? (
+                  <td colSpan={7} className="py-12 text-center text-gray-400 font-normal">
+                    {searchTerm || selectedCreator !== 'ALL' || clientFilter ? (
                       <div>
                         <p className="text-sm font-semibold mb-1">No matching invoices found.</p>
-                        <p className="text-xs text-gray-400">Refine search criteria or clear the query bar.</p>
+                        <p className="text-xs text-gray-400">Refine search criteria or reset active filters.</p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setSelectedCreator('ALL');
+                            setCurrentPage(1);
+                          }}
+                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 rounded-lg text-xs font-semibold hover:bg-indigo-100 transition-colors cursor-pointer"
+                        >
+                          Clear all filters
+                        </button>
                       </div>
                     ) : (
                       <div>
@@ -790,7 +993,7 @@ export default function HistoryView() {
                       </span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      Proforma: <span className="font-mono font-bold text-gray-800 dark:text-gray-200">{selectedLedgerInvoice.invoiceNumber}</span> • Client: <span className="font-semibold text-gray-800 dark:text-gray-200">{selectedLedgerInvoice.customer?.customerName}</span>
+                      Proforma: <span className="font-mono font-bold text-gray-800 dark:text-gray-200">{selectedLedgerInvoice.invoiceNumber}</span> • Client: <span className="font-semibold text-gray-800 dark:text-gray-200">{selectedLedgerInvoice.customer?.customerName}</span> • Created By: <span className="font-semibold text-indigo-600 dark:text-indigo-400">{getCreatorInfo(selectedLedgerInvoice.createdBy).name}</span>
                     </p>
                   </div>
                 </div>

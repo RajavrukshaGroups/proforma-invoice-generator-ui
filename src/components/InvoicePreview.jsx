@@ -7,12 +7,14 @@ import {
   Mail,
   Phone,
   Printer,
+  User,
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { downloadPDF, triggerPrint } from "../utils/pdfGenerator";
 import API from "../api/axios";
-import LogoImg from "../assets/logo.png"
+import LogoImg from "../assets/logo.png";
+import { getCreatorInfo } from "../utils/userHelper";
 
 /* -------------------------------------------------------------------------- */
 /*                                  HELPERS                                   */
@@ -253,6 +255,7 @@ export default function InvoicePreview({
   const customer = invoice.customer || {};
   const items = invoice.items || [];
   const terms = invoice.terms || [];
+  const creator = getCreatorInfo(invoice.createdBy);
 
   /* ------------------------------------------------------------------------ */
   /*                                  UI                                      */
@@ -266,13 +269,24 @@ export default function InvoicePreview({
       <div className="no-print flex flex-col justify-between gap-4 border-b border-gray-200 pb-5 sm:flex-row sm:items-center dark:border-gray-800">
         <button
           onClick={handleBack}
-          className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900"
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900 dark:text-slate-400 dark:hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to History
         </button>
 
         <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 shadow-2xs">
+              <User className="h-3.5 w-3.5 text-indigo-500" />
+              <span className="text-gray-500 dark:text-gray-400 font-normal">Created By:</span>
+              <span className="text-gray-900 dark:text-white font-bold">{creator.name}</span>
+              {creator.email && (
+                <span className="text-gray-400 hidden md:inline">({creator.email})</span>
+              )}
+            </span>
+          </div>
+
           <button
             onClick={() =>
               triggerPrint(
@@ -696,6 +710,21 @@ export default function InvoicePreview({
                       <strong>Due Date:</strong>
                       <span>{formatDateString(invoice.dueDate)}</span>
                     </div>
+
+                    {creator.isKnown && (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "82px 1fr",
+                          alignItems: "baseline",
+                          marginTop: "5px",
+                          lineHeight: 1.25,
+                        }}
+                      >
+                        <strong>Prepared By:</strong>
+                        <span>{creator.name}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 

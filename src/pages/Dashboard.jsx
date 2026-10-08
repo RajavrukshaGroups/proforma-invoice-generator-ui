@@ -13,6 +13,7 @@ import {
   ArrowUpRight 
 } from 'lucide-react';
 import API from '../api/axios';
+import { getCreatorInfo } from '../utils/userHelper';
 
 export default function Dashboard() {
   const [invoices, setInvoices] = useState([]);
@@ -126,7 +127,7 @@ export default function Dashboard() {
 
   // Sorting list by ID (which incorporates timestamp) to show 5 most recent
   const sortedRecent = [...invoices]
-    .sort((a, b) => (b._id || '').localeCompare(a._id || ''))
+    .sort((a, b) => String(b?._id || '').localeCompare(String(a?._id || '')))
     .slice(0, 5);
 
   const formatCurrency = (val) => {
@@ -348,6 +349,7 @@ export default function Dashboard() {
                   <th className="py-3 px-3 whitespace-nowrap">Invoice No</th>
                   <th className="py-3 px-3">Client</th>
                   <th className="py-3 px-3 whitespace-nowrap">Issued Date</th>
+                  <th className="py-3 px-3 whitespace-nowrap">Created By</th>
                   <th className="py-3 px-3 text-right whitespace-nowrap">Sum Total</th>
                   <th className="py-3 px-3 text-center whitespace-nowrap">Payment Status</th>
                   <th className="py-3 px-3 text-center whitespace-nowrap">Action</th>
@@ -364,6 +366,21 @@ export default function Dashboard() {
                       <td className="py-3 px-3 font-semibold text-gray-900 dark:text-white whitespace-nowrap">{inv.invoiceNumber}</td>
                       <td className="py-3 px-3 font-semibold text-gray-900 dark:text-white truncate max-w-[140px]">{inv.customer?.customerName}</td>
                       <td className="py-3 px-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">{formatDateLabel(inv.invoiceDate)}</td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        {(() => {
+                          const creator = getCreatorInfo(inv.createdBy);
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800/80 font-bold flex items-center justify-center text-[9px] shrink-0 select-none">
+                                {creator.initials}
+                              </span>
+                              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate max-w-[110px]" title={creator.name}>
+                                {creator.name}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </td>
                       <td className="py-3 px-3 text-right font-bold text-indigo-600 dark:text-indigo-400 whitespace-nowrap">{formatCurrency(inv.grandTotal)}</td>
                       <td className="py-3 px-3 text-center">
                         {(() => {
@@ -451,7 +468,7 @@ export default function Dashboard() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-gray-400 font-normal">
+                    <td colSpan={7} className="py-8 text-center text-gray-400 font-normal">
                       No invoices found in your system. Start by creating a new proforma.
                     </td>
                   </tr>
