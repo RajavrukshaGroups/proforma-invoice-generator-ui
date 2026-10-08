@@ -711,20 +711,7 @@ export default function InvoicePreview({
                       <span>{formatDateString(invoice.dueDate)}</span>
                     </div>
 
-                    {creator.isKnown && (
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "82px 1fr",
-                          alignItems: "baseline",
-                          marginTop: "5px",
-                          lineHeight: 1.25,
-                        }}
-                      >
-                        <strong>Prepared By:</strong>
-                        <span>{creator.name}</span>
-                      </div>
-                    )}
+                    
                   </div>
                 </div>
 
